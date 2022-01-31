@@ -47,7 +47,7 @@ func (c *GophermartController) CreateAuthCookie(ctx context.Context, userEntity 
 	}, nil
 }
 
-func (c GophermartController) PostApiUserRegister(w http.ResponseWriter, r *http.Request) {
+func (c GophermartController) PostApiUserRegister(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || request.Login == "" || request.Password == "" {
@@ -77,7 +77,7 @@ func (c GophermartController) PostApiUserRegister(w http.ResponseWriter, r *http
 	_, _ = w.Write([]byte(`{"status": "success"}`))
 }
 
-func (c GophermartController) PostApiUserLogin(w http.ResponseWriter, r *http.Request) {
+func (c GophermartController) PostApiUserLogin(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || request.Login == "" || request.Password == "" {
@@ -107,7 +107,7 @@ func (c GophermartController) PostApiUserLogin(w http.ResponseWriter, r *http.Re
 	_, _ = w.Write([]byte(`{"status": "success"}`))
 }
 
-func (c GophermartController) PostApiUserOrders(w http.ResponseWriter, r *http.Request) {
+func (c GophermartController) PostApiUserOrders(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	session, ok := r.Context().Value(sessionKey).(*entity.Session)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
