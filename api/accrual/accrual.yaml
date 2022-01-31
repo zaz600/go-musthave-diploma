@@ -1,0 +1,64 @@
+openapi: "3.0.2"
+info:
+  title: bm API
+  description: сервис для расчета начисления бонусных баллов
+  version: "1.0"
+servers:
+  - url: https://api.server.test/v1
+paths:
+  /api/orders/{number}:
+    get:
+      summary: получение информации о расчёте начислений баллов лояльности.
+      responses:
+        '200':
+          description: успешная обработка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+        '429':
+          description: превышено количество запросов к сервису
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+                description: время, через которое надо повторить запрос
+        '500':
+          description: внутренняя ошибка сервера.
+
+      parameters:
+        - in: path
+          name: number
+          required: true
+          schema:
+            $ref: '#/components/schemas/Order'
+
+components:
+  schemas:
+    Order:
+      type: integer
+      minimum: 1
+      description: номер заказа
+
+    # https://github.com/deepmap/oapi-codegen/issues/399
+    Response:
+      type: object
+      properties:
+        order:
+          $ref: '#/components/schemas/Order'
+        status:
+          type: string
+          description: >
+            Статус расчёта начисления
+            * `REGISTERED` - заказ зарегистрирован, но не начисление не рассчитано
+            * `INVALID` - заказ не принят к расчёту, и вознаграждение не будет начислено. Конечный статус
+            * `PROCESSING` - расчёт начисления в процессе
+            * `PROCESSED` - расчёт начисления окончен. Конечный статус.
+          enum:
+            - REGISTERED
+            - INVALID
+            - PROCESSING
+            - PROCESSED
+        accrual:
+          type: integer
+          description: рассчитанные баллы к начислению, при отсутствии начисления — поле отсутствует в ответе
