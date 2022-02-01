@@ -27,7 +27,7 @@ func newRouter(t *testing.T) *chi.Mux {
 	return httpcontroller.NewRouter(userService, sessionService, orderService)
 }
 
-func TestGophermartController_PostApiUserRegister(t *testing.T) {
+func TestGophermartController_UserRegister(t *testing.T) {
 	user := RegisterRequest{
 		Login:    "foouser",
 		Password: "pass",
@@ -59,7 +59,7 @@ func TestGophermartController_PostApiUserRegister(t *testing.T) {
 		Status(http.StatusConflict)
 }
 
-func TestGophermartController_PostApiUserLogin(t *testing.T) {
+func TestGophermartController_UserLogin(t *testing.T) {
 	user := LoginRequest{
 		Login:    "foouser",
 		Password: "pass",
@@ -101,7 +101,7 @@ func TestGophermartController_PostApiUserLogin(t *testing.T) {
 		Status(http.StatusUnauthorized)
 }
 
-func TestGophermartController_PostApiUserOrders(t *testing.T) {
+func TestGophermartController_UploadOrder(t *testing.T) {
 	user := RegisterRequest{
 		Login:    "foouser",
 		Password: "pass",
@@ -158,6 +158,42 @@ func TestGophermartController_PostApiUserOrders(t *testing.T) {
 		Status(http.StatusConflict)
 }
 
+func TestGophermartController_GetUserOrders(t *testing.T) {
+	user := RegisterRequest{
+		Login:    "foouser",
+		Password: "pass",
+	}
+
+	server := httptest.NewServer(newRouter(t))
+	defer server.Close()
+	e := httpexpect.New(t, server.URL)
+
+	e.GET("/api/user/orders").
+		Expect().
+		Status(http.StatusUnauthorized)
+
+	register(t, e, user)
+
+	e.GET("/api/user/orders").
+		Expect().
+		Status(http.StatusNoContent)
+
+	uploadOrder(t, e, "92345678905")
+	uploadOrder(t, e, "12345678903")
+	uploadOrder(t, e, "346436439")
+
+	json := e.GET("/api/user/orders").
+		Expect().
+		Status(http.StatusOK).
+		ContentType("application/json").
+		JSON()
+
+	json.Array().Length().Equal(3)
+	json.Array().Element(0).Object().Value("number").Equal("92345678905")
+	json.Array().Element(1).Object().Value("number").Equal("12345678903")
+	json.Array().Element(2).Object().Value("number").Equal("346436439")
+}
+
 func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
 	t.Helper()
 
@@ -169,4 +205,13 @@ func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
 		Cookie(sessionCookieName).
 		Value().
 		NotEmpty()
+}
+
+func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string) {
+	t.Helper()
+
+	e.POST("/api/user/orders").
+		WithText(orderID).
+		Expect().
+		Status(http.StatusAccepted)
 }

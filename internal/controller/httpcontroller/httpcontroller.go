@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -48,7 +49,7 @@ func (c *GophermartController) CreateAuthCookie(ctx context.Context, userEntity 
 }
 
 //lint:ignore ST1003 ignore this!
-func (c GophermartController) PostApiUserRegister(w http.ResponseWriter, r *http.Request) { //nolint:revive
+func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || request.Login == "" || request.Password == "" {
@@ -79,7 +80,7 @@ func (c GophermartController) PostApiUserRegister(w http.ResponseWriter, r *http
 }
 
 //lint:ignore ST1003 ignore this!
-func (c GophermartController) PostApiUserLogin(w http.ResponseWriter, r *http.Request) { //nolint:revive
+func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || request.Login == "" || request.Password == "" {
@@ -110,7 +111,7 @@ func (c GophermartController) PostApiUserLogin(w http.ResponseWriter, r *http.Re
 }
 
 //lint:ignore ST1003 ignore this!
-func (c GophermartController) PostApiUserOrders(w http.ResponseWriter, r *http.Request) { //nolint:revive,stylecheck
+func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request) { //nolint:revive,stylecheck
 	session, ok := r.Context().Value(sessionKey).(*entity.Session)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -145,6 +146,49 @@ func (c GophermartController) PostApiUserOrders(w http.ResponseWriter, r *http.R
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Request) {
+	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	orders, err := c.orderService.GetUserOrders(context.TODO(), session.UID)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if len(orders) == 0 {
+		http.Error(w, http.StatusText(http.StatusNoContent), http.StatusNoContent)
+		return
+	}
+	sort.SliceStable(orders, func(i, j int) bool {
+		return orders[i].UploadedAt < orders[j].UploadedAt
+	})
+	var resp = Gophermart.OrdersResponse{}
+	for _, order := range orders {
+		respOrder := Gophermart.Order{
+			Number:     order.OrderID,
+			Status:     Gophermart.OrderStatus(order.Status),
+			UploadedAt: time.UnixMilli(order.UploadedAt).Format(time.RFC3339),
+		}
+		if order.Status == entity.OrderStatusPROCESSED {
+			respOrder.Accrual = &order.Accrual
+		}
+		resp = append(resp, respOrder)
+	}
+
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(bytes)
 }
 
 func NewRouter(

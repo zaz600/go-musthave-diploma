@@ -7,6 +7,7 @@ servers:
 paths:
   /api/user/register:
     post:
+      operationId: userRegister
       summary: Регистрация пользователя в программе лояльности
       description: >
         После успешной регистрации происходит автоматическая аутентификация пользователя через cookie.
@@ -35,6 +36,7 @@ paths:
 
   /api/user/login:
     post:
+      operationId: userLogin
       summary: Аутентификация пользователя
       description: Аутентификация производится по паре логин/пароль
       tags:
@@ -46,7 +48,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
-              example:
+            example:
                 login: userfoo
                 password: p@sw0dr
       responses:
@@ -61,6 +63,7 @@ paths:
 
   /api/user/orders:
     post:
+      operationId: uploadOrder
       summary: Загрузка номера заказа
       tags:
         - Заказы
@@ -89,6 +92,25 @@ paths:
         '500':
             description: Внутренняя ошибка сервера
 
+    get:
+      operationId: getUserOrders
+      summary: Получение списка загруженных номеров заказов
+      tags:
+        - Заказы
+      responses:
+        '200':
+          description: Успешная обработка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersResponse'
+        '204':
+          description: Нет данных для ответа
+        '401':
+          description: Пользователь не авторизован
+        '500':
+          description: Внутренняя ошибка сервера
+
 components:
   schemas:
     RegisterRequest:
@@ -112,4 +134,40 @@ components:
       required:
         - login
         - password
+
+    Order:
+      type: object
+      required:
+        - number
+        - status
+        - uploaded_at
+      properties:
+        number:
+          type: string
+          description: Номер заказа
+          example: "9278923470"
+        status:
+          type: string
+          description: Статус обработки заказа
+          enum:
+            - "NEW"
+            - "PROCESSING"
+            - "INVALID"
+            - "PROCESSED"
+          example: "NEW"
+        accrual:
+          type: integer
+          description: Начисленные баллы. Может быть 0 или отсутствовать
+          minimum: 0
+          example: 500
+
+        uploaded_at:
+          type: string
+          description: Время загрузки заказа
+          example: "2020-12-10T15:12:01+03:00"
+
+    OrdersResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/Order'
 

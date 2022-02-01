@@ -17,11 +17,43 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Defines values for OrderStatus.
+const (
+	OrderStatusINVALID OrderStatus = "INVALID"
+
+	OrderStatusNEW OrderStatus = "NEW"
+
+	OrderStatusPROCESSED OrderStatus = "PROCESSED"
+
+	OrderStatusPROCESSING OrderStatus = "PROCESSING"
+)
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
+
+// Order defines model for Order.
+type Order struct {
+	// Начисленные баллы. Может быть 0 или отсутствовать
+	Accrual *int `json:"accrual,omitempty"`
+
+	// Номер заказа
+	Number string `json:"number"`
+
+	// Статус обработки заказа
+	Status OrderStatus `json:"status"`
+
+	// Время загрузки заказа
+	UploadedAt string `json:"uploaded_at"`
+}
+
+// Статус обработки заказа
+type OrderStatus string
+
+// OrdersResponse defines model for OrdersResponse.
+type OrdersResponse []Order
 
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {
@@ -29,29 +61,32 @@ type RegisterRequest struct {
 	Password string `json:"password"`
 }
 
-// PostApiUserLoginJSONBody defines parameters for PostApiUserLogin.
-type PostApiUserLoginJSONBody LoginRequest
+// UserLoginJSONBody defines parameters for UserLogin.
+type UserLoginJSONBody LoginRequest
 
-// PostApiUserRegisterJSONBody defines parameters for PostApiUserRegister.
-type PostApiUserRegisterJSONBody RegisterRequest
+// UserRegisterJSONBody defines parameters for UserRegister.
+type UserRegisterJSONBody RegisterRequest
 
-// PostApiUserLoginJSONRequestBody defines body for PostApiUserLogin for application/json ContentType.
-type PostApiUserLoginJSONRequestBody PostApiUserLoginJSONBody
+// UserLoginJSONRequestBody defines body for UserLogin for application/json ContentType.
+type UserLoginJSONRequestBody UserLoginJSONBody
 
-// PostApiUserRegisterJSONRequestBody defines body for PostApiUserRegister for application/json ContentType.
-type PostApiUserRegisterJSONRequestBody PostApiUserRegisterJSONBody
+// UserRegisterJSONRequestBody defines body for UserRegister for application/json ContentType.
+type UserRegisterJSONRequestBody UserRegisterJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Аутентификация пользователя
 	// (POST /api/user/login)
-	PostApiUserLogin(w http.ResponseWriter, r *http.Request)
+	UserLogin(w http.ResponseWriter, r *http.Request)
+	// Получение списка загруженных номеров заказов
+	// (GET /api/user/orders)
+	GetUserOrders(w http.ResponseWriter, r *http.Request)
 	// Загрузка номера заказа
 	// (POST /api/user/orders)
-	PostApiUserOrders(w http.ResponseWriter, r *http.Request)
+	UploadOrder(w http.ResponseWriter, r *http.Request)
 	// Регистрация пользователя в программе лояльности
 	// (POST /api/user/register)
-	PostApiUserRegister(w http.ResponseWriter, r *http.Request)
+	UserRegister(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -63,12 +98,12 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
-// PostApiUserLogin operation middleware
-func (siw *ServerInterfaceWrapper) PostApiUserLogin(w http.ResponseWriter, r *http.Request) {
+// UserLogin operation middleware
+func (siw *ServerInterfaceWrapper) UserLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiUserLogin(w, r)
+		siw.Handler.UserLogin(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -78,12 +113,12 @@ func (siw *ServerInterfaceWrapper) PostApiUserLogin(w http.ResponseWriter, r *ht
 	handler(w, r.WithContext(ctx))
 }
 
-// PostApiUserOrders operation middleware
-func (siw *ServerInterfaceWrapper) PostApiUserOrders(w http.ResponseWriter, r *http.Request) {
+// GetUserOrders operation middleware
+func (siw *ServerInterfaceWrapper) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiUserOrders(w, r)
+		siw.Handler.GetUserOrders(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -93,12 +128,27 @@ func (siw *ServerInterfaceWrapper) PostApiUserOrders(w http.ResponseWriter, r *h
 	handler(w, r.WithContext(ctx))
 }
 
-// PostApiUserRegister operation middleware
-func (siw *ServerInterfaceWrapper) PostApiUserRegister(w http.ResponseWriter, r *http.Request) {
+// UploadOrder operation middleware
+func (siw *ServerInterfaceWrapper) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var handler = func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostApiUserRegister(w, r)
+		siw.Handler.UploadOrder(w, r)
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler(w, r.WithContext(ctx))
+}
+
+// UserRegister operation middleware
+func (siw *ServerInterfaceWrapper) UserRegister(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var handler = func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UserRegister(w, r)
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -222,13 +272,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/user/login", wrapper.PostApiUserLogin)
+		r.Post(options.BaseURL+"/api/user/login", wrapper.UserLogin)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/user/orders", wrapper.PostApiUserOrders)
+		r.Get(options.BaseURL+"/api/user/orders", wrapper.GetUserOrders)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/user/register", wrapper.PostApiUserRegister)
+		r.Post(options.BaseURL+"/api/user/orders", wrapper.UploadOrder)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/user/register", wrapper.UserRegister)
 	})
 
 	return r
@@ -237,24 +290,30 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/8RWT2/jRBT/KtbAMYrTtAusT8AFIVUCLeK09GCSaesl8XhnJt2tqkpOWmClFgXBYQ9o",
-	"tXwEN62Jt4ndr/DeN0JvnLjZrB1aINpL63g878/v/d7vvSPWEt1A+NzXijlHTLX2edc1j9tiz/Mf8ac9",
-	"rjT9DqQIuNQeN6cdOqUHfRhw5jClpefvseMaC1ylngnZLjk8rjHJn/Y8ydvMeTyzsXBjpza/Ib5/wlua",
-	"zD3ie57SXL7vSOiK5+8KY8zTHTr7QgT7XHZdqa1tceh29KH1DZcHXouzGjvgUnnCZw7bqDcoHBFw3w08",
-	"5rDNeqPeNO70vsnBdgPP7iku7SKbQOTJtrlqSS/QuSn4FU9wADGkOIAETyGBa4jwJ0hwaMENhpBBAmMY",
-	"QQZXkOAA++YAMvoTYQixBRPI4BISSO3ZuwwmeM5MhNIlT1+2mcO+Fkp/FnjfKi63Z/jIvAifi/YhxdYS",
-	"vua+CdMNgo7XMpftJ0r4t2Sipw8l32UO+8C+ZZs9o5r9Fs8MzEspvzYxRjCFGAcY4pkFVzChtCIY4QAy",
-	"DE3OBgZI2GJptexxU2sVCF/lhGk2GiXAvs5RgDFkMILIgDzBcwtPsA83EOMLSAnFaLkABvwwvwUpFXqr",
-	"1MEriGEEMYaQ4hm8sfDURD4lXxaFn5cP+xDlRjZWG4Eor6wBp7KoxzX2oDSc3yClTIgRkEKKQ7KW4QtI",
-	"4II4ZWHf+Mm9RaZlVK/bdeXhP/OwFMshqzHt7ilqOPgTYgoX+yaE4mZSAvCtZbZDUdw2i5BtLtVit1Qy",
-	"+Kv801UU1vy5toOO6y2R912iYB8mEMPV21Qhfph8zi0T7imGyy05+wreGApTtfCM1Rh/7nYDUpSN5ubW",
-	"g48+/uRhY7MQIM/XfI/L0tZ4BZlpizAn0DVE9N+CkQW/Q4anpnZTQ4dr6h6I/2V3VDjCE/iLFOUCz2CS",
-	"H11imL+F1MJfqIYwrWAExDAlgjYbzQqXI9MpBrKyNG9M5xN3BybnDC6MUlxAhgO4xpM1d2OVZkBKoNxJ",
-	"KR7+b2DDlflxeQfAt5rNe0NS1ICAXwhrbQrzsshvbL6ujmBBVl7OX+PZsljI2SKxYrgWrb2k+gRG+K5g",
-	"kVrN+hv7+ON85BZzKYcOEvwZYuwbGRuu1LdK5bSMCQphbLWE+MHj9e/8VQN7vjXde2YXUlQsVozQ2xVi",
-	"cT1yWPCpetZoS6r+3cb88h53r0lfjv6aJ/0435cW/C50b/moWtsuUCYTf8wnfqEMdNGo4dqasmJsV9GW",
-	"RDnvkMtZYaezBRSHiyPT1PK/7wYUK5cHZid4fMR6ssMctq91oBybhKCen9Y1V9o+2GDHO8d/BwAA///R",
-	"lNh1AQ0AAA==",
+	"H4sIAAAAAAAC/8xXy27bRhT9FWLaXRWJou0m5qqPBIEBIymcPhapUTDSxGYqkcxw5MQIDMiy0wRwChfp",
+	"Ios2SIv+AP1QzEQW8wt3/qi4dyiJoijbSSu0G1s0PTNnzj333KNHrOY3A9/jngyZ/YiFtXXedOjjsr/m",
+	"eiv8fouHEp8D4QdcSJfT2wa+xQ9yM+DMZqEUrrfGtkoscMLwgS/qBS+3Skzw+y1X8Dqzb6d7ZFaslgYr",
+	"/Dv3eE3idjdFnYvJ851aTbScBn6s87Am3EC6vsdsBi8hUk8gVtvQgy70oa/2oGvAAUTQg57aKxvwOyTw",
+	"GrqqY8CB2lMd9cwwDYihB7EBieqobbVDPztwCAkcQoT/w0qMP3SaQYMze8E0S6zpem6z1WS2OcTtepKv",
+	"cYHAvVbzjkY+ATCBU+iqtgEnEMFbiPB3dne2aF2+smjNzV82WWmS4VA6shUW7Pyn6hDUHbVtQAIHqg0R",
+	"HOCN4C1eLXech9hvsxvXvmMl9tXKzS+v3bq1dOM6K7GlG99+vrx0dfTna1exOCOAes0EslbQ8J06r//g",
+	"yAJ4z1UbunCq9jWSI9VWO3BSCG14kGVa5qWqdalqfl1dsKuWbVY/Medss4CYnLpS/od0jaObKrVwhYeB",
+	"74UcL+BK3iSiPxb8LrPZR5VRu1TSXqlohW4NN3SEcDbxeYWvuaHk4r9uIlziend92syVxOt1P1jnoukI",
+	"aSz7m05Dbhq3uNhwa5yV2AYXoa5ZtWwiHD/gnhO4zGZzZbNs0XFyne5QcQK30gq5qAxvE/hhUfl/wabC",
+	"llQdiNUuxFhw9RPEKIh3qg0JxHBCHXcMMfUfvoAEf0SoHQN6kMARxNCvpH9LoEedibQ6eNJSndnsm5CL",
+	"5ZQYodn/wq9vIqia70nuET4nCBpujVZV7oU+YR8qb1gdhpe76/tZjm0WfBY+MOtUdq2D81QyZqdUkhw9",
+	"r+g+EVlDR7XVngHH0EMKIjhUHUhUm/ghyiBmWRlI0eKkCy1dKoxlmgVFeKUZg5OBr0EXnw30DHgHXfUU",
+	"+sh4lC8WFaqtV0Ef7z1feMBL6MIhuhsZ7xtD7RLyUzxLtzmVWm1DpDepnr0JRFoFRM5UAWyV2EIhnOfQ",
+	"Jy9vp7NgH3dL1FOI4QD1Z6htOkefFlF7ha1m0xGb52u2kMt9dCZnLcTmhD+gi3BxlOD2g5VxAcGjndkq",
+	"ohg1lk++hJdb4yTccbFf5xL1rt2LFavgHNVfTMI5fywS8V8ZFVHh8lMoKtCAZc4XawAVc4xyQy2px8OG",
+	"SGgwd3HaTdfQNKVDH41kvKcyqp6JjDSWHfWElsfQNYgnDClDSvQ4fD3ILHjd/iApIMDsjEzgMKuyF4MX",
+	"ao+t4vRIDThnijT+9LQ6yxYlfygrQcNxc9KY5DfNWMfjDCNsEvwzg/S8i0ln3N/T/4I3VFJsZ7WXHftV",
+	"a25+4dPLVxbNucloVSC74khlIGm/QqJ2icNT8ou3pJvuB9rnlIN04ShNQm+inIb6GZscTqdYBoYi3QfW",
+	"lCMPyUpHeshd8x3JGFXZoTvnmk7tzNiuz2m1i4ySxX+NbDimh6MLED5vWe9Nyagno/HUOivveDEWlaMz",
+	"EEx1hLFpItJUekZSG7Z2LhYgGe3JiYbjLO1vta0eD/Lb0GQ1dRCj/WnHo1TzAaPVoC0QwolR8/0fXV7+",
+	"3itMf4Ps/f8JgPlvA++VAYtpn3EGPNGpO3Nupm2LQ8zMUmKRP/w2yIJDS8CFZIMz68YpgW6aXtGNdWsc",
+	"pYU9Tb/GqP3srKRa/vPUiFi52KC0ePsRa4kGs9m6lEFoV9AByvptWfJQVjaqbGt16+8AAAD///pDArAC",
+	"EgAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

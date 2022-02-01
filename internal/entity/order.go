@@ -9,10 +9,10 @@ import (
 type OrderStatus string
 
 const (
-	NEW        OrderStatus = "NEW"
-	PROCESSING OrderStatus = "PROCESSING"
-	INVALID    OrderStatus = "INVALID"
-	PROCESSED  OrderStatus = "PROCESSED"
+	OrderStatusNEW        OrderStatus = "NEW"
+	OrderStatusPROCESSING OrderStatus = "PROCESSING"
+	OrderStatusINVALID    OrderStatus = "INVALID"
+	OrderStatusPROCESSED  OrderStatus = "PROCESSED"
 )
 
 type Order struct {
@@ -30,7 +30,7 @@ func NewOrder(userID string, orderID string) *Order {
 		UID:        userID,
 		OrderID:    orderID,
 		UploadedAt: time.Now().UnixMilli(),
-		Status:     NEW,
+		Status:     OrderStatusNEW,
 		Accrual:    0,
 	}
 }

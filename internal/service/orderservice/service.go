@@ -12,7 +12,7 @@ import (
 
 type OrderService interface {
 	UploadOrder(ctx context.Context, userID string, orderID string) error
-	GetUserOrders(ctx context.Context, userID string) ([]*entity.Session, error)
+	GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error)
 }
 
 type Service struct {
@@ -38,9 +38,9 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 	return nil
 }
 
-func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Session, error) {
-	// TODO implement me
-	panic("implement me")
+func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error) {
+	// TODO обработать ошибки и завернуть их
+	return s.orderRepository.GetUserOrders(ctx, userID)
 }
 
 func NewService(orderRepository orderrepository.OrderRepository) *Service {
