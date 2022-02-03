@@ -194,6 +194,33 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 	json.Array().Element(2).Object().Value("number").Equal("346436439")
 }
 
+func TestGophermartController_GetUserBalance(t *testing.T) {
+	user := RegisterRequest{
+		Login:    "foouser",
+		Password: "pass",
+	}
+
+	server := httptest.NewServer(newRouter(t))
+	defer server.Close()
+	e := httpexpect.New(t, server.URL)
+
+	e.GET("/api/user/balance").
+		Expect().
+		Status(http.StatusUnauthorized)
+
+	register(t, e, user)
+
+	json := e.GET("/api/user/balance").
+		Expect().
+		Status(http.StatusOK).
+		JSON().
+		Object()
+
+	json.Value("current").Equal(0.0)
+	json.Value("withdrawn").Equal(0.0)
+	// TODO
+}
+
 func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
 	t.Helper()
 

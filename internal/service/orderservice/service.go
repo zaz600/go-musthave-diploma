@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
@@ -40,7 +41,14 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 
 func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error) {
 	// TODO обработать ошибки и завернуть их
-	return s.orderRepository.GetUserOrders(ctx, userID)
+	orders, err := s.orderRepository.GetUserOrders(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(orders, func(i, j int) bool {
+		return orders[i].UploadedAt < orders[j].UploadedAt
+	})
+	return orders, nil
 }
 
 func NewService(orderRepository orderrepository.OrderRepository) *Service {

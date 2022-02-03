@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -164,9 +163,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 		http.Error(w, http.StatusText(http.StatusNoContent), http.StatusNoContent)
 		return
 	}
-	sort.SliceStable(orders, func(i, j int) bool {
-		return orders[i].UploadedAt < orders[j].UploadedAt
-	})
+
 	var resp = Gophermart.OrdersResponse{}
 	for _, order := range orders {
 		respOrder := Gophermart.Order{
@@ -189,6 +186,33 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(bytes)
+}
+
+func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Request) {
+	_, ok := r.Context().Value(sessionKey).(*entity.Session)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	// TODO implement me
+	balance := Gophermart.UserBalanceResponse{
+		Current:   0.0,
+		Withdrawn: 0.0,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(balance)
+}
+
+func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *http.Request) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func NewRouter(
