@@ -28,6 +28,9 @@ const (
 	OrderStatusPROCESSING OrderStatus = "PROCESSING"
 )
 
+// Amount defines model for Amount.
+type Amount float32
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Login    string `json:"login"`
@@ -37,7 +40,7 @@ type LoginRequest struct {
 // Order defines model for Order.
 type Order struct {
 	// Начисленные баллы. Может быть 0 или отсутствовать
-	Accrual *int `json:"accrual,omitempty"`
+	Accrual *float32 `json:"accrual,omitempty"`
 
 	// Номер заказа
 	Number string `json:"number"`
@@ -63,14 +66,14 @@ type RegisterRequest struct {
 
 // UserBalanceResponse defines model for UserBalanceResponse.
 type UserBalanceResponse struct {
-	Current   float32 `json:"current"`
-	Withdrawn float32 `json:"withdrawn"`
+	Current   Amount `json:"current"`
+	Withdrawn Amount `json:"withdrawn"`
 }
 
 // UserBalanceWithdrawRequest defines model for UserBalanceWithdrawRequest.
 type UserBalanceWithdrawRequest struct {
-	Order *string  `json:"order,omitempty"`
-	Sun   *float32 `json:"sun,omitempty"`
+	Order *string `json:"order,omitempty"`
+	Sun   *Amount `json:"sun,omitempty"`
 }
 
 // UserBalanceWithdrawJSONBody defines parameters for UserBalanceWithdraw.
@@ -371,34 +374,34 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"658AAAD//2EUV0bqGQAA",
+	"H4sIAAAAAAAC/9RYX2/TVhT/Ktbd3hYaJ21H66fBQKhSBVPZxgOrJpPctmaJba5tSoUqJWkZTGHq/jzw",
+	"sE0M7Qu4bUJD27hf4dxvNJ1jO3Ecp0kZYfDSOonvuefP7/zO797HrGRVbcvkpusw7TFzShu8qtPjlarl",
+	"mS4+Vb2Ka9gVfmuNaeqMWsgxd8vmTGOmV73HBdvOsWVr3TBX+AOPO7TEFpbNhWtwMlXBX/EhWue4wjDX",
+	"cZ2tO86mJcoZP27nmOAPPEPwMtPuRjYSK1Z7blj37vOSi+ZuiTIXw/vrpZLw9Ao+lrlTEobtGpbJNAZ/",
+	"gS+fQkfW4QTa0IWubEJbgX3w4QROZHNGgT8hgNfQlg0F9mVTNuRzRVWgAyfQUSCQDVmXO/S3AQcQwAH4",
+	"+A7LMf5Ir9oVzrR5Vc1NksToKcvLAE6hLWsKHIEPx+Dj/+QWbLF4eWGxODt3WWW54TQ7ru56ToblV7JB",
+	"/u7IugIB7Msa+LCPYcExxpfazvSqWIub1++wHPtq5daX12/fXrp5g+XY0s1vrywvXet/ff0aVqjvYLhm",
+	"yDPPrlh6mZe/190M936TNWjDqdwLPTmUNbkDR5mu9TYqqkX1UqF4qaB+XZjXCkVNLXymzmpqRmJSEIvy",
+	"30vXoHcj8eascMe2TIdjAIbLq5ToTwVfYxr7JN9vsHzUXfkQpts9g7oQ+hZ+XuHrhuNy8f930jcOF1f1",
+	"im6WeDK8QW9KnhA85Ijzwo2YZDvHNg13oyz0TXPSJSnX4w2TlsZ4fyd6cWRKrZgzhrvGu4ifKSfwK8Nc",
+	"s8iy4RI0b1j2BhdVXbjKsrWlV9wt5TYXD40SZzn2kAsnhH1hRsXtLZubum0wjc3OqDNFqpi7QT7nddvI",
+	"ew4X+XthlPjlOqfoMDYdG2ipjFtyN5EMhukMq0l2iqpKdbRMN6qjbtsVo0Tr8/cdy+wPhXGpyEIMZSHV",
+	"0//IOpxBWz6DLvjY2Wna8cPePpM1CGQdfMzFnFrIoIeXEMCJfA5HMe9CGz8r0EUS9+FANiCQNejEb0AX",
+	"jc2HUae5BrpE5LVoEOyRb/IZdGCfvJJ1pGA4oL8+1dzxqlVdbPV92ZFPaXkH2gq5cyx35E/QhkMI4rHi",
+	"QxfDUuAs0/095Cl93UG8w6/9FWwVdxyqfD7uBEK25WRgIKMbWNhX3HGvWuWtaWAg3XdZUHjRLzPWjFJ8",
+	"RtPYj3IYT2LMENvORu8Hh685tZgtNRRZR3zgvCUb0EIPwhEMgXwKXQjwHYRgK1QUZK+Yba8dYRFFyxtF",
+	"7pIvp2gMrUeSIQ43HpXTwv/4WqYCS6D8VfJNaoCLAF+vOCPpLwOQ+Pr7ocFJWuCt0FpU57IBEVYedSm0",
+	"CAKHBKhUet8t3sfRIHSgm8Dmj9AhBxU4kE1SzK1hbAwWvCd6YnpLuf0L4hb3kw3oyF3oYNpwI8wnJY48",
+	"DvfqkFbfI/bFPz5urBDDHKKr+eg7ygTLZeBpOdJPFyPQnkDtiTiGwa1ZVlKKacz+wtlUy6QOJwPcwNEr",
+	"C2IvKR6f6KAha7KpQAvnTLqiUW1YUnK5wuOT0e4o7ODRoofwQAE/XSwqVG2QP9UL892EjJ4wErZbWGx/",
+	"JACmRZfnY3a8MPibNEUH+wXNxys7GQnuW04zKUlfZ5x2DA850+TM1DHq/fBki/iwK5vySa8hAjrEt3Ei",
+	"f7SqM2b7XkrCU/Pr+H4Dw+2rgwAOkvogGBzML+IfZJOt4iEzW1/SKTk81J5Hiy5/5Obtim6koDGc3+g+",
+	"pjWYYXSbAP9cITzvylqa36O34A2VlEZPM3k7UCjOzs1/fnlhUZ3tndgM0+XreB7PgF32zYuCSfsdArlL",
+	"OTwlvjgm3LTfkj5HbBQWjm6e4GSonIr8GZscTkdQBrThNOyD4ogtD4hK+3hIhXlGMEZUNijmVNPJnSnT",
+	"9ZhWm2SULL6zZEOLPhxOkPCPRrH3b9T8czwYyQgD00REl1fnKLVea6dkASajNjzRcJxF/S3r8kms33ok",
+	"G6YOOnSoIsYjVfMWo1UhE+jCkVKyrB8MPvOdman+4iu6D0cApi8NL6QBs9M+ZQ14FKruxL6Jts0WMVNT",
+	"iVn88EesBXuUcERH0T3ZmFo3jhB0o/CKbBy2xmFU2NPoGCP3krOSavnfVSP6ysVDUot3HzNPVJjGNlzX",
+	"1vL5ilXSKxuW42oL6oLKtle3/w0AAP//lGiaXlYaAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

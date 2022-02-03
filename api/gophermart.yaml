@@ -3,7 +3,7 @@ info:
   title: Gophermart Loyalty Service
   version: "1.0"
 servers:
-  - url: https://api.server.test/v1
+  - url: http://localhost:8080
 paths:
   /api/user/register:
     post:
@@ -217,10 +217,10 @@ components:
             - "PROCESSED"
           example: "NEW"
         accrual:
-          type: integer
+          type: number
           description: Начисленные баллы. Может быть 0 или отсутствовать
-          minimum: 0
           example: 500
+          multipleOf: 0.01
 
         uploaded_at:
           type: string
@@ -236,9 +236,9 @@ components:
       type: object
       properties:
         current:
-          type: number
+          $ref: "#/components/schemas/Amount"
         withdrawn:
-          type: number
+          $ref: "#/components/schemas/Amount"
       required:
         - current
         - withdrawn
@@ -249,7 +249,7 @@ components:
         order:
           type: string
         sun:
-          type: number
+          $ref: "#/components/schemas/Amount"
 
     UserBalanceWithdrawalsResponse:
       type: array
@@ -262,10 +262,14 @@ components:
         order:
           type: string
         sum:
-          type: number
+          $ref: "#/components/schemas/Amount"
         processed_at:
           type: string
       required:
         - order
         - sum
         - processed_at
+
+    Amount:
+      type: number
+      multipleOf: 0.01

@@ -22,7 +22,7 @@ type Order struct {
 	UploadedAt int64       `json:"uploaded_at"`
 	Status     OrderStatus `json:"status"`
 	// TODO https://github.com/shopspring/decimal
-	Accrual int `json:"accrual"`
+	Accrual float32 `json:"accrual"`
 }
 
 func NewOrder(userID string, orderID string) *Order {
