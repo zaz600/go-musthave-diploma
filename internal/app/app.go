@@ -10,14 +10,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/app/config"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/service/orderservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/sessionservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
+	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/httpserver"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/logger"
 )
@@ -36,11 +32,12 @@ func Run(args []string) error {
 		Msg("config")
 
 	// TODO выбрать нужный тип репозитория
-	userRepo := userrepository.NewInmemoryUserRepository()
-	userService := userservice.NewService(userRepo)
-	sessionService := sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
-	orderService := orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
-	server := httpserver.New(httpcontroller.NewRouter(userService, sessionService, orderService), httpserver.WithAddr(cfg.ServerAddress))
+	accrualClient, err := Accrual.NewClientWithResponses(cfg.AccrualAddress)
+	if err != nil {
+		return err
+	}
+	service := gophermartservice.NewWithMemStorage(accrualClient)
+	server := httpserver.New(httpcontroller.NewRouter(service), httpserver.WithAddr(cfg.ServerAddress))
 
 	go func() {
 		<-ctx.Done()

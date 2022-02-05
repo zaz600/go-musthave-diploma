@@ -25,7 +25,7 @@ func (s Service) Register(ctx context.Context, login string, password string) (*
 		return nil, err
 	}
 	user := entity.NewUserEntity(login, hashedPassword)
-	err = s.userRepository.Add(ctx, user)
+	err = s.userRepository.AddUser(ctx, user)
 	if err != nil {
 		if errors.Is(err, userrepository.ErrUserExists) {
 			return nil, ErrUserExists
@@ -36,7 +36,7 @@ func (s Service) Register(ctx context.Context, login string, password string) (*
 }
 
 func (s Service) Login(ctx context.Context, login string, password string) (*entity.UserEntity, error) {
-	user, err := s.userRepository.Get(ctx, login)
+	user, err := s.userRepository.GetUser(ctx, login)
 	if err != nil {
 		if errors.Is(err, userrepository.ErrUserNotFound) {
 			return nil, ErrAuth

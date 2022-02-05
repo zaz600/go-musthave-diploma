@@ -20,14 +20,14 @@ type Service struct {
 func (s Service) NewSession(ctx context.Context, userID string) (*entity.Session, error) {
 	// TODO проверить на пустоту userID или сделать констрейнт
 	session := entity.NewSession(userID)
-	if err := s.sessionRepository.Add(ctx, session); err != nil {
+	if err := s.sessionRepository.AddSession(ctx, session); err != nil {
 		return nil, fmt.Errorf("error creating user session: %w", err)
 	}
 	return session, nil
 }
 
 func (s Service) Get(ctx context.Context, sessionID string) (*entity.Session, error) {
-	session, err := s.sessionRepository.Get(ctx, sessionID)
+	session, err := s.sessionRepository.GetSession(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("error get session: %w", err)
 	}

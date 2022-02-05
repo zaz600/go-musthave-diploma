@@ -8,12 +8,11 @@ import (
 )
 
 type InmemoryOrderRepository struct {
-	mu         sync.RWMutex
-	db         map[string]*entity.Order
-	userOrders map[string][]*entity.Order
+	mu sync.RWMutex
+	db map[string]*entity.Order
 }
 
-func (r *InmemoryOrderRepository) Add(_ context.Context, order *entity.Order) error {
+func (r *InmemoryOrderRepository) AddOrder(_ context.Context, order *entity.Order) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -24,7 +23,14 @@ func (r *InmemoryOrderRepository) Add(_ context.Context, order *entity.Order) er
 		return ErrOrderExists
 	}
 	r.db[order.OrderID] = order
-	r.userOrders[order.UID] = append(r.userOrders[order.UID], order)
+	return nil
+}
+
+func (r *InmemoryOrderRepository) UpdateOrder(_ context.Context, order *entity.Order) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.db[order.OrderID] = order
 	return nil
 }
 
@@ -32,17 +38,29 @@ func (r *InmemoryOrderRepository) GetUserOrders(_ context.Context, userID string
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	orders, ok := r.userOrders[userID]
-	if !ok {
-		return []*entity.Order{}, nil
+	var orders []*entity.Order
+	for _, order := range r.db {
+		if order.UID == userID {
+			orders = append(orders, order)
+		}
 	}
 	return orders, nil
 }
 
+func (r *InmemoryOrderRepository) GetOrder(_ context.Context, orderID string) (*entity.Order, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	order, ok := r.db[orderID]
+	if !ok {
+		return nil, ErrOrderNotFound
+	}
+	return order, nil
+}
+
 func NewInmemoryOrderRepository() *InmemoryOrderRepository {
 	return &InmemoryOrderRepository{
-		mu:         sync.RWMutex{},
-		db:         make(map[string]*entity.Order, 100),
-		userOrders: make(map[string][]*entity.Order, 100),
+		mu: sync.RWMutex{},
+		db: make(map[string]*entity.Order, 100),
 	}
 }

@@ -13,12 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 	Gophermart "github.com/zaz600/go-musthave-diploma/api"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
+	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/orderservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/sessionservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
+	"github.com/zaz600/go-musthave-diploma/internal/utils/luhn"
 )
-
-const sessionCookieName = "GM_LS_SESSION"
 
 type key int
 
@@ -29,22 +28,7 @@ const (
 var _ Gophermart.ServerInterface = &GophermartController{}
 
 type GophermartController struct {
-	userService    userservice.UserService
-	sessionService sessionservice.SessionService
-	orderService   orderservice.OrderService
-}
-
-func (c *GophermartController) CreateAuthCookie(ctx context.Context, userEntity *entity.UserEntity) (*http.Cookie, error) {
-	// TODO в сервис унести и криптовать/подписывать куку
-	session, err := c.sessionService.NewSession(ctx, userEntity.UID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &http.Cookie{
-		Name:  sessionCookieName,
-		Value: session.SessionID, // TODO подписать
-	}, nil
+	gophermartService *gophermartservice.GophermartService
 }
 
 //lint:ignore ST1003 ignore this!
@@ -56,7 +40,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user, err := c.userService.Register(context.TODO(), request.Login, request.Password)
+	session, err := c.gophermartService.RegisterUser(context.TODO(), request.Login, request.Password)
 	if err != nil {
 		if errors.Is(err, userservice.ErrUserExists) {
 			http.Error(w, "login already in use", http.StatusConflict)
@@ -65,13 +49,11 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	cookie, err := c.CreateAuthCookie(context.TODO(), user)
+	err = c.gophermartService.SetAuthCookie(w, session)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, cookie)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -87,7 +69,7 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := c.userService.Login(context.TODO(), request.Login, request.Password)
+	session, err := c.gophermartService.LoginUser(context.TODO(), request.Login, request.Password)
 	if err != nil {
 		if errors.Is(err, userservice.ErrAuth) {
 			http.Error(w, "invalid login/password", http.StatusUnauthorized)
@@ -97,20 +79,18 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cookie, err := c.CreateAuthCookie(context.TODO(), user)
+	err = c.gophermartService.SetAuthCookie(w, session)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	http.SetCookie(w, cookie)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status": "success"}`))
 }
 
-//lint:ignore ST1003 ignore this!
-func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request) { //nolint:revive,stylecheck
+func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	session, ok := r.Context().Value(sessionKey).(*entity.Session)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -125,7 +105,7 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 	orderID := string(bytes)
 
 	log.Info().Str("uid", session.UID).Str("orderID", orderID).Msg("")
-	err = c.orderService.UploadOrder(context.TODO(), session.UID, orderID)
+	err = c.gophermartService.OrderService.UploadOrder(context.TODO(), session.UID, orderID)
 	if err != nil {
 		if errors.Is(err, orderservice.ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
@@ -143,6 +123,8 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	go c.gophermartService.GetAccruals(context.TODO(), orderID, 0)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 }
@@ -154,7 +136,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	orders, err := c.orderService.GetUserOrders(context.TODO(), session.UID)
+	orders, err := c.gophermartService.OrderService.GetUserOrders(context.TODO(), session.UID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -189,16 +171,21 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Request) {
-	_, ok := r.Context().Value(sessionKey).(*entity.Session)
+	session, ok := r.Context().Value(sessionKey).(*entity.Session)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	// TODO implement me
+	currentBalance, withdrawalsSum, err := c.gophermartService.GetUserBalance(context.TODO(), session.UID)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 	balance := Gophermart.UserBalanceResponse{
-		Current:   0.0,
-		Withdrawn: 0.0,
+		Current:   Gophermart.Amount(currentBalance),
+		Withdrawn: Gophermart.Amount(withdrawalsSum),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -206,24 +193,78 @@ func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Req
 }
 
 func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
-	// TODO implement me
-	panic("implement me")
+	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	var request Gophermart.UserBalanceWithdrawRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil || request.Order == "" || request.Sum <= 0.0 {
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	if ok := luhn.CheckLuhn(request.Order); !ok {
+		http.Error(w, "invalid orderID format, check luhn mismatch", http.StatusUnprocessableEntity)
+		return
+	}
+
+	currentBalance, _, err := c.gophermartService.GetUserBalance(context.TODO(), session.UID)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if currentBalance < float32(request.Sum) {
+		http.Error(w, "insufficient funds", http.StatusPaymentRequired)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *http.Request) {
-	// TODO implement me
-	panic("implement me")
+	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	if !ok {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	withdrawals, err := c.gophermartService.WithdrawalService.GetUserWithdrawals(context.TODO(), session.UID)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if len(withdrawals) == 0 {
+		http.Error(w, http.StatusText(http.StatusNoContent), http.StatusNoContent)
+		return
+	}
+
+	var resp = Gophermart.UserBalanceWithdrawalsResponse{}
+	for _, withdrawal := range withdrawals {
+		respWithdrawal := Gophermart.UserBalanceWithdrawal{
+			Order:       withdrawal.OrderID,
+			ProcessedAt: time.UnixMilli(withdrawal.ProcessedAt).Format(time.RFC3339),
+			Sum:         Gophermart.Amount(withdrawal.Sum),
+		}
+		resp = append(resp, respWithdrawal)
+	}
+
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(bytes)
 }
 
-func NewRouter(
-	userService userservice.UserService,
-	sessionService sessionservice.SessionService,
-	orderService orderservice.OrderService,
-) *chi.Mux {
+func NewRouter(gophermartService *gophermartservice.GophermartService) *chi.Mux {
 	c := &GophermartController{
-		userService:    userService,
-		sessionService: sessionService,
-		orderService:   orderService,
+		gophermartService: gophermartService,
 	}
 
 	r := chi.NewRouter()
@@ -245,19 +286,12 @@ func NewRouter(
 
 func (c GophermartController) AuthCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for _, cookie := range r.Cookies() {
-			if cookie.Name == sessionCookieName {
-				sessionID := cookie.Value
-				session, err := c.sessionService.Get(context.TODO(), sessionID)
-				if err == nil {
-					ctx := context.WithValue(r.Context(), sessionKey, session)
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
-				}
-				break
-			}
+		session, err := c.gophermartService.GetSession(r)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
 		}
-
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), sessionKey, session)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

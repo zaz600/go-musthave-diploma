@@ -27,18 +27,18 @@ const (
 )
 
 // номер заказа
-type Order int
+type Order string
 
 // Response defines model for Response.
 type Response struct {
 	// рассчитанные баллы к начислению, при отсутствии начисления — поле отсутствует в ответе
-	Accrual *int `json:"accrual,omitempty"`
+	Accrual *float32 `json:"accrual,omitempty"`
 
 	// номер заказа
-	Order *Order `json:"order,omitempty"`
+	Order Order `json:"order"`
 
 	// Статус расчёта начисления * `REGISTERED` - заказ зарегистрирован, но не начисление не рассчитано * `INVALID` - заказ не принят к расчёту, и вознаграждение не будет начислено. Конечный статус * `PROCESSING` - расчёт начисления в процессе * `PROCESSED` - расчёт начисления окончен. Конечный статус.
-	Status *ResponseStatus `json:"status,omitempty"`
+	Status ResponseStatus `json:"status"`
 }
 
 // Статус расчёта начисления * `REGISTERED` - заказ зарегистрирован, но не начисление не рассчитано * `INVALID` - заказ не принят к расчёту, и вознаграждение не будет начислено. Конечный статус * `PROCESSING` - расчёт начисления в процессе * `PROCESSED` - расчёт начисления окончен. Конечный статус.
@@ -117,12 +117,12 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// GetApiOrdersNumber request
-	GetApiOrdersNumber(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetOrderAccrual request
+	GetOrderAccrual(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) GetApiOrdersNumber(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetApiOrdersNumberRequest(c.Server, number)
+func (c *Client) GetOrderAccrual(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetOrderAccrualRequest(c.Server, number)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +133,8 @@ func (c *Client) GetApiOrdersNumber(ctx context.Context, number Order, reqEditor
 	return c.Client.Do(req)
 }
 
-// NewGetApiOrdersNumberRequest generates requests for GetApiOrdersNumber
-func NewGetApiOrdersNumberRequest(server string, number Order) (*http.Request, error) {
+// NewGetOrderAccrualRequest generates requests for GetOrderAccrual
+func NewGetOrderAccrualRequest(server string, number Order) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -210,18 +210,18 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// GetApiOrdersNumber request
-	GetApiOrdersNumberWithResponse(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*GetApiOrdersNumberResponse, error)
+	// GetOrderAccrual request
+	GetOrderAccrualWithResponse(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*GetOrderAccrualResponse, error)
 }
 
-type GetApiOrdersNumberResponse struct {
+type GetOrderAccrualResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Response
 }
 
 // Status returns HTTPResponse.Status
-func (r GetApiOrdersNumberResponse) Status() string {
+func (r GetOrderAccrualResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -229,31 +229,31 @@ func (r GetApiOrdersNumberResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetApiOrdersNumberResponse) StatusCode() int {
+func (r GetOrderAccrualResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-// GetApiOrdersNumberWithResponse request returning *GetApiOrdersNumberResponse
-func (c *ClientWithResponses) GetApiOrdersNumberWithResponse(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*GetApiOrdersNumberResponse, error) {
-	rsp, err := c.GetApiOrdersNumber(ctx, number, reqEditors...)
+// GetOrderAccrualWithResponse request returning *GetOrderAccrualResponse
+func (c *ClientWithResponses) GetOrderAccrualWithResponse(ctx context.Context, number Order, reqEditors ...RequestEditorFn) (*GetOrderAccrualResponse, error) {
+	rsp, err := c.GetOrderAccrual(ctx, number, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetApiOrdersNumberResponse(rsp)
+	return ParseGetOrderAccrualResponse(rsp)
 }
 
-// ParseGetApiOrdersNumberResponse parses an HTTP response from a GetApiOrdersNumberWithResponse call
-func ParseGetApiOrdersNumberResponse(rsp *http.Response) (*GetApiOrdersNumberResponse, error) {
+// ParseGetOrderAccrualResponse parses an HTTP response from a GetOrderAccrualWithResponse call
+func ParseGetOrderAccrualResponse(rsp *http.Response) (*GetOrderAccrualResponse, error) {
 	bodyBytes, err := ioutil.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetApiOrdersNumberResponse{
+	response := &GetOrderAccrualResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

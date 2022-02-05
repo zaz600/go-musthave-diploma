@@ -7,6 +7,6 @@ import (
 )
 
 type UserRepository interface {
-	Get(ctx context.Context, login string) (entity.UserEntity, error)
-	Add(ctx context.Context, entity entity.UserEntity) error
+	GetUser(ctx context.Context, login string) (entity.UserEntity, error)
+	AddUser(ctx context.Context, entity entity.UserEntity) error
 }

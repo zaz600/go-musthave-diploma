@@ -8,6 +8,7 @@ servers:
 paths:
   /api/orders/{number}:
     get:
+      operationId: getOrderAccrual
       summary: получение информации о расчёте начислений баллов лояльности.
       responses:
         '200':
@@ -36,8 +37,8 @@ paths:
 components:
   schemas:
     Order:
-      type: integer
-      minimum: 1
+      type: string
+      minLength: 2
       description: номер заказа
 
     # https://github.com/deepmap/oapi-codegen/issues/399
@@ -60,5 +61,8 @@ components:
             - PROCESSING
             - PROCESSED
         accrual:
-          type: integer
+          type: number
           description: рассчитанные баллы к начислению, при отсутствии начисления — поле отсутствует в ответе
+      required:
+        - status
+        - order

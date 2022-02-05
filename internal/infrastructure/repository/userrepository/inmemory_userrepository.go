@@ -19,7 +19,7 @@ func NewInmemoryUserRepository() *InmemoryUserRepository {
 	}
 }
 
-func (r *InmemoryUserRepository) Get(_ context.Context, login string) (entity.UserEntity, error) {
+func (r *InmemoryUserRepository) GetUser(_ context.Context, login string) (entity.UserEntity, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -29,7 +29,7 @@ func (r *InmemoryUserRepository) Get(_ context.Context, login string) (entity.Us
 	return entity.UserEntity{}, ErrUserNotFound
 }
 
-func (r *InmemoryUserRepository) Add(_ context.Context, userEntity entity.UserEntity) error {
+func (r *InmemoryUserRepository) AddUser(_ context.Context, userEntity entity.UserEntity) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

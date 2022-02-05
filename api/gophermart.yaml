@@ -164,7 +164,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserBalanceWithdrawRequest'
+                $ref: '#/components/schemas/UserBalanceWithdrawalsResponse'
 
         '204':
           description: Нет ни одного списания
@@ -248,8 +248,11 @@ components:
       properties:
         order:
           type: string
-        sun:
+        sum:
           $ref: "#/components/schemas/Amount"
+      required:
+        - order
+        - sum
 
     UserBalanceWithdrawalsResponse:
       type: array

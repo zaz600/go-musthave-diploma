@@ -1,30 +1,39 @@
 package httpcontroller_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/go-chi/chi"
+	"github.com/stretchr/testify/require"
 	. "github.com/zaz600/go-musthave-diploma/api"
+	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/service/orderservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/sessionservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
+	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
 )
 
 const sessionCookieName = "GM_LS_SESSION"
 
 func newRouter(t *testing.T) *chi.Mux {
 	t.Helper()
-	userService := userservice.NewService(userrepository.NewInmemoryUserRepository())
-	sessionService := sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
-	orderService := orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
-	return httpcontroller.NewRouter(userService, sessionService, orderService)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var accrual float32 = 50.0
+		resp := Accrual.Response{
+			Accrual: &accrual,
+			Order:   "1",
+			Status:  Accrual.ResponseStatusPROCESSED,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+
+	accrualClient, err := Accrual.NewClientWithResponses(server.URL)
+	require.NoError(t, err)
+	return httpcontroller.NewRouter(gophermartservice.NewWithMemStorage(accrualClient))
 }
 
 func TestGophermartController_UserRegister(t *testing.T) {
@@ -189,9 +198,9 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		JSON()
 
 	json.Array().Length().Equal(3)
-	json.Array().Element(0).Object().Value("number").Equal("92345678905")
-	json.Array().Element(1).Object().Value("number").Equal("12345678903")
-	json.Array().Element(2).Object().Value("number").Equal("346436439")
+	json.Array().Element(0).Object().Value("status").Equal("PROCESSED")
+	json.Array().Element(1).Object().Value("status").Equal("PROCESSED")
+	json.Array().Element(2).Object().Value("status").Equal("PROCESSED")
 }
 
 func TestGophermartController_GetUserBalance(t *testing.T) {
@@ -221,6 +230,33 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 	// TODO
 }
 
+func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
+	user := RegisterRequest{
+		Login:    "foouser",
+		Password: "pass",
+	}
+
+	server := httptest.NewServer(newRouter(t))
+	defer server.Close()
+	e := httpexpect.New(t, server.URL)
+
+	e.POST("/api/user/balance/withdraw").
+		Expect().
+		Status(http.StatusUnauthorized)
+
+	register(t, e, user)
+
+	e.POST("/api/user/balance/withdraw").
+		Expect().
+		Status(http.StatusBadRequest)
+
+	e.POST("/api/user/balance/withdraw").
+		WithText(`{"order": "92345678905", "sum": 751.21}`).
+		Expect().
+		Status(http.StatusPaymentRequired)
+	// TODO
+}
+
 func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
 	t.Helper()
 
@@ -232,6 +268,27 @@ func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
 		Cookie(sessionCookieName).
 		Value().
 		NotEmpty()
+}
+
+func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
+	user := RegisterRequest{
+		Login:    "foouser",
+		Password: "pass",
+	}
+
+	server := httptest.NewServer(newRouter(t))
+	defer server.Close()
+	e := httpexpect.New(t, server.URL)
+
+	e.GET("/api/user/balance/withdrawals").
+		Expect().
+		Status(http.StatusUnauthorized)
+
+	register(t, e, user)
+
+	e.GET("/api/user/balance/withdrawals").
+		Expect().
+		Status(http.StatusNoContent)
 }
 
 func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string) {

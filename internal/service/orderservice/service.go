@@ -14,6 +14,7 @@ import (
 type OrderService interface {
 	UploadOrder(ctx context.Context, userID string, orderID string) error
 	GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error)
+	SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error
 }
 
 type Service struct {
@@ -26,7 +27,7 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 	}
 
 	order := entity.NewOrder(userID, orderID)
-	err := s.orderRepository.Add(ctx, order)
+	err := s.orderRepository.AddOrder(ctx, order)
 	if err != nil {
 		if errors.Is(err, orderrepository.ErrOrderExists) {
 			return ErrOrderExists
@@ -49,6 +50,16 @@ func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Or
 		return orders[i].UploadedAt < orders[j].UploadedAt
 	})
 	return orders, nil
+}
+
+func (s Service) SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error {
+	order, err := s.orderRepository.GetOrder(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	order.Status = status
+	order.Accrual = accrual
+	return s.orderRepository.UpdateOrder(ctx, order)
 }
 
 func NewService(orderRepository orderrepository.OrderRepository) *Service {
