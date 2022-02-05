@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
@@ -99,16 +100,19 @@ func (s GophermartService) GetUserBalance(ctx context.Context, userID string) (f
 
 func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retryNum int) {
 	// TODO переписать без рекурсии))
-	if retryNum > 3 {
+	if retryNum > 5 {
+		log.Info().Int("retryNum", retryNum).Msg("GetAccruals retry limit")
 		return
 	}
 
 	select {
 	case <-ctx.Done():
+		log.Info().Int("retryNum", retryNum).Msg("GetAccruals context done")
 		return
 	default:
 		resp, err := s.accrualClient.GetOrderAccrualWithResponse(ctx, Accrual.Order(orderID))
 		if err != nil {
+			log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("GetOrderAccrualWithResponse error")
 			time.Sleep(1 * time.Second)
 			go s.GetAccruals(ctx, orderID, retryNum+1)
 			return
@@ -119,6 +123,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retr
 			if err != nil {
 				retryAfterSec = 5
 			}
+			log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Int("retryAfterSec", retryAfterSec).Msg("StatusTooManyRequests")
 			time.Sleep(time.Duration(retryAfterSec) * time.Second)
 			go s.GetAccruals(ctx, orderID, retryNum+1)
 			return
@@ -128,14 +133,23 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retr
 			switch resp.JSON200.Status {
 			case Accrual.ResponseStatusINVALID:
 				// TODO err
-				_ = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusINVALID, 0)
+				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusINVALID, 0)
+				if err != nil {
+					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("SetOrderStatus error")
+				}
 				return
 			case Accrual.ResponseStatusPROCESSED:
 				// TODO err
-				_ = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusPROCESSED, *resp.JSON200.Accrual)
+				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusPROCESSED, *resp.JSON200.Accrual)
+				if err != nil {
+					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("SetOrderStatus error")
+					return
+				}
+				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals result")
 				return
 			default:
-				// будем повторять
+				// будем повторять на других статусах
+				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Str("accrual status", string(resp.JSON200.Status)).Msg("SetOrderStatus error")
 				go s.GetAccruals(ctx, orderID, retryNum+1)
 				return
 			}

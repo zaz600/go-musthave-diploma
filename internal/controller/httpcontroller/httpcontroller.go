@@ -104,7 +104,7 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 	}
 	orderID := string(bytes)
 
-	log.Info().Str("uid", session.UID).Str("orderID", orderID).Msg("")
+	log.Info().Str("uid", session.UID).Str("orderID", orderID).Msg("UploadOrder")
 	err = c.gophermartService.OrderService.UploadOrder(context.TODO(), session.UID, orderID)
 	if err != nil {
 		if errors.Is(err, orderservice.ErrOrderExists) {
@@ -125,7 +125,7 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 
 	go c.gophermartService.GetAccruals(context.TODO(), orderID, 0)
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/ json")
 	w.WriteHeader(http.StatusAccepted)
 }
 

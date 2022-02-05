@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/go-chi/chi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	. "github.com/zaz600/go-musthave-diploma/api"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
@@ -15,7 +17,10 @@ import (
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
 )
 
-const sessionCookieName = "GM_LS_SESSION"
+const (
+	sessionCookieName    = "GM_LS_SESSION"
+	orderProcessedStatus = "PROCESSED"
+)
 
 func newRouter(t *testing.T) *chi.Mux {
 	t.Helper()
@@ -191,16 +196,20 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 	uploadOrder(t, e, "12345678903")
 	uploadOrder(t, e, "346436439")
 
-	json := e.GET("/api/user/orders").
-		Expect().
-		Status(http.StatusOK).
-		ContentType("application/json").
-		JSON()
+	assert.Eventually(t, func() bool {
+		json := e.GET("/api/user/orders").
+			Expect().
+			Status(http.StatusOK).
+			ContentType("application/json").
+			JSON()
 
-	json.Array().Length().Equal(3)
-	json.Array().Element(0).Object().Value("status").Equal("PROCESSED")
-	json.Array().Element(1).Object().Value("status").Equal("PROCESSED")
-	json.Array().Element(2).Object().Value("status").Equal("PROCESSED")
+		count := json.Array().Length().Raw()
+		order1Status := json.Array().Element(0).Object().Value("status").String().Raw()
+		order2Status := json.Array().Element(1).Object().Value("status").String().Raw()
+		order3Status := json.Array().Element(2).Object().Value("status").String().Raw()
+
+		return count == 3 && order1Status == orderProcessedStatus && order2Status == orderProcessedStatus && order3Status == orderProcessedStatus
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func TestGophermartController_GetUserBalance(t *testing.T) {
