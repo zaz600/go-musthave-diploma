@@ -115,14 +115,14 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 
 	if taskContext.RetryCount > 5 {
 		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals retry limit")
-		err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusERROR, 0)
+		err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusTooManyRetries, 0)
 		logError(err)
 		return
 	}
 
 	resp := s.getAccrual(ctx, orderID, &taskContext)
 	switch resp.status {
-	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID, entity.OrderStatusERROR:
+	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID:
 		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Float32("accrual", resp.accrual).Msg("GetAccruals completed")
 		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
 		logError(err)
@@ -130,24 +130,29 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	default:
 		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
 		logError(err)
-		err = s.OrderService.ReScheduleOrderProcessingTask(ctx, orderID, time.Now().Add(resp.next))
-		logError(err)
 	}
+
+	next := 50 * time.Millisecond
+	if resp.retryAfterSec > 0 {
+		next = time.Duration(resp.retryAfterSec) * time.Second
+	}
+	err = s.OrderService.ReScheduleOrderProcessingTask(ctx, orderID, time.Now().Add(next))
+	logError(err)
 
 	select {
 	case <-ctx.Done():
 		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals context done")
 		return
-	case <-time.After(resp.next):
+	case <-time.After(next):
 		go s.GetAccruals(ctx, orderID) // решедуллим
 		return
 	}
 }
 
 type getAccrualStatus struct {
-	status  entity.OrderStatus
-	next    time.Duration
-	accrual float32
+	status        entity.OrderStatus
+	retryAfterSec int
+	accrual       float32
 }
 
 //nolint:funlen
@@ -161,7 +166,7 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 	resp, err := s.accrualClient.GetOrderAccrualWithResponse(ctx, Accrual.Order(orderID))
 	if err != nil {
 		logError(err)
-		return getAccrualStatus{next: 1 * time.Second, status: entity.OrderStatusPROCESSING}
+		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 	}
 
 	if resp.StatusCode() == http.StatusTooManyRequests {
@@ -170,12 +175,12 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 		if err != nil {
 			retryAfterSec = 5
 		}
-		return getAccrualStatus{next: time.Duration(retryAfterSec) * time.Second, status: entity.OrderStatusPROCESSING}
+		return getAccrualStatus{retryAfterSec: retryAfterSec, status: entity.OrderStatusTECHNICALERROR}
 	}
 
 	if resp.StatusCode() != 200 {
 		logError(fmt.Errorf("unknown http status %d", resp.StatusCode()))
-		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+		return getAccrualStatus{status: entity.OrderStatusTECHNICALERROR}
 	}
 
 	log.Info().
@@ -191,12 +196,12 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 	case Accrual.ResponseStatusPROCESSED:
 		return getAccrualStatus{accrual: *resp.JSON200.Accrual, status: entity.OrderStatusPROCESSED}
 	case Accrual.ResponseStatusREGISTERED:
-		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 	case Accrual.ResponseStatusPROCESSING:
-		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 	}
 	logError(fmt.Errorf("unknown accrual status %s", resp.JSON200.Status))
-	return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+	return getAccrualStatus{status: entity.OrderStatusTECHNICALERROR}
 }
 
 func NewWithMemStorage(accrualClient Accrual.ClientWithResponsesInterface) *GophermartService {

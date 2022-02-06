@@ -9,11 +9,12 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusNEW        OrderStatus = "NEW"
-	OrderStatusPROCESSING OrderStatus = "PROCESSING"
-	OrderStatusINVALID    OrderStatus = "INVALID"
-	OrderStatusPROCESSED  OrderStatus = "PROCESSED"
-	OrderStatusERROR      OrderStatus = "ERROR"
+	OrderStatusNEW            OrderStatus = "NEW"
+	OrderStatusPROCESSING     OrderStatus = "PROCESSING"
+	OrderStatusINVALID        OrderStatus = "INVALID"
+	OrderStatusPROCESSED      OrderStatus = "PROCESSED"
+	OrderStatusTECHNICALERROR OrderStatus = "TECHNICAL_ERROR"
+	OrderStatusTooManyRetries OrderStatus = "TOO_MANY_RETRIES"
 )
 
 type TaskContext struct {
