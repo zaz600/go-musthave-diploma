@@ -175,12 +175,12 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 		if err != nil {
 			retryAfterSec = 5
 		}
-		return getAccrualStatus{retryAfterSec: retryAfterSec, status: entity.OrderStatusTECHNICALERROR}
+		return getAccrualStatus{retryAfterSec: retryAfterSec, status: entity.OrderStatusPROCESSING}
 	}
 
 	if resp.StatusCode() != 200 {
 		logError(fmt.Errorf("unknown http status %d", resp.StatusCode()))
-		return getAccrualStatus{status: entity.OrderStatusTECHNICALERROR}
+		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 	}
 
 	log.Info().
@@ -201,7 +201,7 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 	}
 	logError(fmt.Errorf("unknown accrual status %s", resp.JSON200.Status))
-	return getAccrualStatus{status: entity.OrderStatusTECHNICALERROR}
+	return getAccrualStatus{status: entity.OrderStatusPROCESSING}
 }
 
 func NewWithMemStorage(accrualClient Accrual.ClientWithResponsesInterface) *GophermartService {
