@@ -123,7 +123,7 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	go c.gophermartService.GetAccruals(context.TODO(), orderID, 0)
+	go c.gophermartService.GetAccruals(context.TODO(), orderID)
 
 	w.Header().Set("Content-Type", "application/ json")
 	w.WriteHeader(http.StatusAccepted)

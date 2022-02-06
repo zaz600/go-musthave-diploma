@@ -13,7 +13,13 @@ const (
 	OrderStatusPROCESSING OrderStatus = "PROCESSING"
 	OrderStatusINVALID    OrderStatus = "INVALID"
 	OrderStatusPROCESSED  OrderStatus = "PROCESSED"
+	OrderStatusERROR      OrderStatus = "ERROR"
 )
+
+type TaskContext struct {
+	RetryCount  int
+	NextRetryAt time.Time
+}
 
 type Order struct {
 	ID         string
@@ -23,6 +29,8 @@ type Order struct {
 	Status     OrderStatus `json:"status"`
 	// TODO https://github.com/shopspring/decimal
 	Accrual float32 `json:"accrual"`
+
+	Context TaskContext
 }
 
 func NewOrder(userID string, orderID string) *Order {
@@ -33,5 +41,9 @@ func NewOrder(userID string, orderID string) *Order {
 		UploadedAt: time.Now().UnixMilli(),
 		Status:     OrderStatusNEW,
 		Accrual:    0,
+		Context: TaskContext{
+			RetryCount:  0,
+			NextRetryAt: time.Now(),
+		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
@@ -15,6 +16,8 @@ type OrderService interface {
 	UploadOrder(ctx context.Context, userID string, orderID string) error
 	GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error)
 	SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error
+	ReScheduleOrderProcessingTask(ctx context.Context, orderID string, next time.Time) error
+	GetOrder(ctx context.Context, orderID string) (*entity.Order, error)
 }
 
 type Service struct {
@@ -59,6 +62,20 @@ func (s Service) SetOrderStatus(ctx context.Context, orderID string, status enti
 	}
 	order.Status = status
 	order.Accrual = accrual
+	return s.orderRepository.UpdateOrder(ctx, order)
+}
+
+func (s Service) GetOrder(ctx context.Context, orderID string) (*entity.Order, error) {
+	return s.orderRepository.GetOrder(ctx, orderID)
+}
+
+func (s Service) ReScheduleOrderProcessingTask(ctx context.Context, orderID string, next time.Time) error {
+	order, err := s.orderRepository.GetOrder(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	order.Context.RetryCount++
+	order.Context.NextRetryAt = next
 	return s.orderRepository.UpdateOrder(ctx, order)
 }
 

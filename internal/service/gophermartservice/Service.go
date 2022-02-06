@@ -2,6 +2,7 @@ package gophermartservice
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -98,71 +99,104 @@ func (s GophermartService) GetUserBalance(ctx context.Context, userID string) (f
 	return balance - withdrawalsSum, withdrawalsSum, nil
 }
 
-//nolint:funlen
-func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retryNum int) {
-	// TODO переписать без рекурсии))
-	if retryNum > 5 {
-		log.Info().Int("retryNum", retryNum).Msg("GetAccruals retry limit")
+func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
+	order, err := s.OrderService.GetOrder(ctx, orderID)
+	if err != nil {
+		log.Err(err).Str("orderID", orderID).Msg("order not found")
 		return
+	}
+
+	taskContext := order.Context
+	logError := func(err error) {
+		if err != nil {
+			log.Err(err).Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("error during getAccrual occurred")
+		}
+	}
+
+	if taskContext.RetryCount > 5 {
+		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals retry limit")
+		err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusERROR, 0)
+		logError(err)
+		return
+	}
+
+	resp := s.getAccrual(ctx, orderID, &taskContext)
+	switch resp.status {
+	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID, entity.OrderStatusERROR:
+		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Float32("accrual", resp.accrual).Msg("GetAccruals completed")
+		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
+		logError(err)
+		return
+	default:
+		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
+		logError(err)
+		err = s.OrderService.ReScheduleOrderProcessingTask(ctx, orderID, time.Now().Add(resp.next))
+		logError(err)
 	}
 
 	select {
 	case <-ctx.Done():
-		log.Info().Int("retryNum", retryNum).Msg("GetAccruals context done")
+		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals context done")
 		return
-	default:
-		resp, err := s.accrualClient.GetOrderAccrualWithResponse(ctx, Accrual.Order(orderID))
-		if err != nil {
-			log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("GetOrderAccrualWithResponse error")
-			time.Sleep(1 * time.Second)
-			go s.GetAccruals(ctx, orderID, retryNum+1)
-			return
-		}
-		if resp.StatusCode() == http.StatusTooManyRequests {
-			retryAfter := resp.HTTPResponse.Header.Get("Retry-After")
-			retryAfterSec, err := strconv.Atoi(retryAfter)
-			if err != nil {
-				retryAfterSec = 5
-			}
-			log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Int("retryAfterSec", retryAfterSec).Msg("StatusTooManyRequests")
-			time.Sleep(time.Duration(retryAfterSec) * time.Second)
-			go s.GetAccruals(ctx, orderID, retryNum+1)
-			return
-		}
+	case <-time.After(resp.next):
+		go s.GetAccruals(ctx, orderID) // решедуллим
+		return
+	}
+}
 
-		if resp.StatusCode() == 200 {
-			switch resp.JSON200.Status {
-			case Accrual.ResponseStatusINVALID:
-				// TODO err
-				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusINVALID, 0)
-				if err != nil {
-					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("SetOrderStatus error")
-				}
-				return
-			case Accrual.ResponseStatusPROCESSED:
-				// TODO err
-				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusPROCESSED, *resp.JSON200.Accrual)
-				if err != nil {
-					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("SetOrderStatus error")
-					return
-				}
-				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals processed")
-				return
-			case Accrual.ResponseStatusREGISTERED:
-				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusPROCESSING, 0.0)
-				if err != nil {
-					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("SetOrderStatus error")
-					return
-				}
-				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals request registered")
-			}
-			// будем повторять на других статусах
-			log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Str("accrual status", string(resp.JSON200.Status)).Msg("GetAccruals in progress")
-			time.Sleep(50 * time.Millisecond) // TODO конфиг
-			go s.GetAccruals(ctx, orderID, retryNum+1)
-			return
+type getAccrualStatus struct {
+	status  entity.OrderStatus
+	next    time.Duration
+	accrual float32
+}
+
+//nolint:funlen
+func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskContext *entity.TaskContext) getAccrualStatus {
+	logError := func(err error) {
+		if err != nil {
+			log.Err(err).Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("error during getAccrual occurred")
 		}
 	}
+
+	resp, err := s.accrualClient.GetOrderAccrualWithResponse(ctx, Accrual.Order(orderID))
+	if err != nil {
+		logError(err)
+		return getAccrualStatus{next: 1 * time.Second, status: entity.OrderStatusPROCESSING}
+	}
+
+	if resp.StatusCode() == http.StatusTooManyRequests {
+		retryAfter := resp.HTTPResponse.Header.Get("Retry-After")
+		retryAfterSec, err := strconv.Atoi(retryAfter)
+		if err != nil {
+			retryAfterSec = 5
+		}
+		return getAccrualStatus{next: time.Duration(retryAfterSec) * time.Second, status: entity.OrderStatusPROCESSING}
+	}
+
+	if resp.StatusCode() != 200 {
+		logError(fmt.Errorf("unknown http status %s", resp.JSON200.Status))
+		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+	}
+
+	log.Info().
+		Str("orderID", orderID).
+		Int("retryCount", taskContext.RetryCount).
+		Str("accrualStatus", string(resp.JSON200.Status)).
+		Float32("accrual", *resp.JSON200.Accrual).
+		Msg("get accrual result")
+
+	switch resp.JSON200.Status {
+	case Accrual.ResponseStatusINVALID:
+		return getAccrualStatus{accrual: 0.0, status: entity.OrderStatusINVALID}
+	case Accrual.ResponseStatusPROCESSED:
+		return getAccrualStatus{accrual: *resp.JSON200.Accrual, status: entity.OrderStatusPROCESSED}
+	case Accrual.ResponseStatusREGISTERED:
+		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+	case Accrual.ResponseStatusPROCESSING:
+		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
+	}
+	logError(fmt.Errorf("unknown accrual status %s", resp.JSON200.Status))
+	return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
 }
 
 func NewWithMemStorage(accrualClient Accrual.ClientWithResponsesInterface) *GophermartService {
