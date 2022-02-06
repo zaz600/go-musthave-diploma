@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gavv/httpexpect/v2"
 	"github.com/go-chi/chi"
-	"github.com/stretchr/testify/assert"
+	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 	. "github.com/zaz600/go-musthave-diploma/api"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
@@ -30,12 +31,20 @@ var user = RegisterRequest{
 
 func newRouter(t *testing.T) *chi.Mux {
 	t.Helper()
+
+	mu := &sync.Mutex{}
+	orderStates := map[string]int{}
+
 	accrualMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/orders/") {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		orderID := strings.Replace(r.URL.Path, "/api/orders/", "", 1)
+
+		mu.Lock()
+		defer mu.Unlock()
+		orderStates[orderID]++
 
 		var accrual float32 = 50.0
 		status := Accrual.ResponseStatusPROCESSED
@@ -44,7 +53,16 @@ func newRouter(t *testing.T) *chi.Mux {
 		}
 
 		if orderID == "888888880" {
-			status = Accrual.ResponseStatusPROCESSING
+			switch orderStates[orderID] {
+			case 1:
+				status = Accrual.ResponseStatusREGISTERED
+				accrual = 0
+			case 2, 3:
+				status = Accrual.ResponseStatusPROCESSING
+				accrual = 0
+			default:
+				status = Accrual.ResponseStatusPROCESSED
+			}
 		}
 
 		resp := Accrual.Response{
@@ -255,6 +273,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 	})
 }
 
+//nolint:funlen
 func TestGophermartController_GetUserOrders(t *testing.T) {
 	t.Run("success get user orders", func(t *testing.T) {
 		server := httptest.NewServer(newRouter(t))
@@ -267,19 +286,21 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		uploadOrder(t, e, "12345678903")
 		uploadOrder(t, e, "346436439")
 
-		assert.Eventually(t, func() bool {
+		g := NewGomegaWithT(t)
+		g.Eventually(func(g Gomega) {
 			orders := e.GET("/api/user/orders").
 				Expect().
 				Status(http.StatusOK).
 				ContentType("application/json").
-				JSON()
+				JSON().
+				Array()
+			t.Logf("orders resp: %#v", orders.Raw())
 
-			orders.Array().Length().Equal(3)
-			orders.Array().Element(0).Object().Value("status").Equal(orderProcessedStatus)
-			orders.Array().Element(1).Object().Value("status").Equal(orderProcessedStatus)
-			orders.Array().Element(2).Object().Value("status").Equal(orderProcessedStatus)
-			return true
-		}, 2*time.Second, 10*time.Millisecond)
+			g.Expect(orders.Length().Raw()).To(Equal(float64(3)))
+			g.Expect(orders.Element(0).Object().Value("status").String().Raw()).Should(Equal(orderProcessedStatus))
+			g.Expect(orders.Element(1).Object().Value("status").String().Raw()).Should(Equal(orderProcessedStatus))
+			g.Expect(orders.Element(2).Object().Value("status").String().Raw()).Should(Equal(orderProcessedStatus))
+		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 	})
 
 	t.Run("not authorized", func(t *testing.T) {
@@ -312,17 +333,18 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		register(t, e, user)
 		uploadOrder(t, e, "999999998") // invalid in mock
 
-		assert.Eventually(t, func() bool {
-			e.GET("/api/user/orders").
+		g := NewGomegaWithT(t)
+		g.Eventually(func(g Gomega) {
+			order := e.GET("/api/user/orders").
 				Expect().
 				Status(http.StatusOK).JSON().
 				Array().
 				Element(0).
-				Object().
-				Value("status").
-				Equal("INVALID")
-			return true
-		}, 2*time.Second, 10*time.Millisecond)
+				Object()
+			t.Logf("orders resp: %#v", order)
+
+			g.Expect(order.Value("status").String().Raw()).Should(Equal("INVALID"))
+		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 
 		assertBalance(t, e, 0.0, 0.0)
 	})
@@ -333,21 +355,24 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		e := httpexpect.New(t, server.URL)
 
 		register(t, e, user)
-		uploadOrder(t, e, "888888880") // infinite processing status in mock
+		// Этот ордер в моке сервиса accrual проходит все статусы обработки, при запросе начислений
+		uploadOrder(t, e, "888888880") // REGISTERED -> PROCESSING -> PROCESSING -> PROCESSED in mock
 
-		assert.Eventually(t, func() bool {
-			e.GET("/api/user/orders").
+		// Ждем, что ордер дойдет до конца обработки и баллы будут начислены
+		g := NewGomegaWithT(t)
+		g.Eventually(func(g Gomega) {
+			order := e.GET("/api/user/orders").
 				Expect().
 				Status(http.StatusOK).JSON().
 				Array().
 				Element(0).
-				Object().
-				Value("status").
-				Equal("NEW")
-			return true
-		}, 2*time.Second, 10*time.Millisecond)
+				Object()
+			t.Logf("orders resp: %#v", order.Raw())
 
-		assertBalance(t, e, 0.0, 0.0)
+			g.Expect(order.Value("status").String().Raw()).Should(Equal(orderProcessedStatus))
+		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
+
+		assertBalance(t, e, 50.0, 0.0)
 	})
 }
 
@@ -371,17 +396,7 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 		uploadOrder(t, e, "92345678905")
 		uploadOrder(t, e, "346436439")
 
-		assert.Eventually(t, func() bool {
-			balance := e.GET("/api/user/balance").
-				Expect().
-				Status(http.StatusOK).
-				JSON().
-				Object()
-
-			balance.Value("current").Equal(100.0)
-			balance.Value("withdrawn").Equal(0.0)
-			return true
-		}, 2*time.Second, 10*time.Millisecond)
+		assertBalance(t, e, 100.0, 0)
 	})
 
 	t.Run("not authorized", func(t *testing.T) {
@@ -482,16 +497,18 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 			Expect().
 			Status(http.StatusOK)
 
-		assert.Eventually(t, func() bool {
-			e.GET("/api/user/balance/withdrawals").
+		g := NewGomegaWithT(t)
+		g.Eventually(func(g Gomega) {
+			withdrawals := e.GET("/api/user/balance/withdrawals").
 				Expect().
 				Status(http.StatusOK).
 				JSON().
-				Array().
-				Length().Equal(1)
+				Array()
 
-			return true
-		}, 2*time.Second, 10*time.Millisecond)
+			t.Logf("withdrawals resp: %#v", withdrawals)
+
+			g.Expect(withdrawals.Length().Raw()).Should(Equal(float64(1)))
+		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 	})
 
 	t.Run("not authorized", func(t *testing.T) {
@@ -539,19 +556,20 @@ func TestGophermart_SuccessPath(t *testing.T) {
 		Expect().
 		Status(http.StatusAccepted)
 
-	// заказ обработан
-	assert.Eventually(t, func() bool {
-		json := e.GET("/api/user/orders").
+	g := NewGomegaWithT(t)
+	g.Eventually(func(g Gomega) {
+		orders := e.GET("/api/user/orders").
 			Expect().
 			Status(http.StatusOK).
 			ContentType("application/json").
-			JSON()
+			JSON().
+			Array()
 
-		json.Array().Length().Equal(1)
-		json.Array().Element(0).Object().Value("status").Equal(orderProcessedStatus)
+		t.Logf("orders resp: %#v", orders)
 
-		return true
-	}, 2*time.Second, 10*time.Millisecond)
+		g.Expect(orders.Length().Raw()).Should(Equal(float64(1)))
+		g.Expect(orders.Element(0).Object().Value("status").Raw()).Should(Equal(orderProcessedStatus))
+	}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 
 	// баланс поменялся
 	assertBalance(t, e, 50.0, 0.0)
@@ -565,16 +583,17 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	// баланс изменился
 	assertBalance(t, e, 50.0-10.5, 10.5)
 
-	// отображается одно списание
-	assert.Eventually(t, func() bool {
-		e.GET("/api/user/balance/withdrawals").
+	g.Eventually(func(g Gomega) {
+		withdrawals := e.GET("/api/user/balance/withdrawals").
 			Expect().
 			Status(http.StatusOK).
 			JSON().
-			Array().
-			Length().Equal(1)
-		return true
-	}, 2*time.Second, 10*time.Millisecond)
+			Array()
+
+		t.Logf("withdrawals resp: %#v", withdrawals)
+
+		g.Expect(withdrawals.Length().Raw()).Should(Equal(float64(1)))
+	}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 }
 
 func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
@@ -600,15 +619,12 @@ func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string) {
 }
 
 func assertBalance(t *testing.T, e *httpexpect.Expect, current float32, withdrawn float32) {
-	assert.Eventually(t, func() bool {
-		balance := e.GET("/api/user/balance").
-			Expect().
-			Status(http.StatusOK).
-			JSON().
-			Object()
+	g := NewGomegaWithT(t)
+	g.Eventually(func(g Gomega) {
+		balance := e.GET("/api/user/balance").Expect().Status(http.StatusOK).JSON().Object()
+		t.Logf("balance response: %#v", balance.Raw())
 
-		balance.Value("current").Equal(current)
-		balance.Value("withdrawn").Equal(withdrawn)
-		return true
-	}, 2*time.Second, 10*time.Millisecond)
+		g.Expect(balance.Value("current").Number().Raw()).Should(Equal(float64(current)))
+		g.Expect(balance.Value("withdrawn").Number().Raw()).Should(Equal(float64(withdrawn)))
+	}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 }

@@ -98,6 +98,7 @@ func (s GophermartService) GetUserBalance(ctx context.Context, userID string) (f
 	return balance - withdrawalsSum, withdrawalsSum, nil
 }
 
+//nolint:funlen
 func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retryNum int) {
 	// TODO переписать без рекурсии))
 	if retryNum > 5 {
@@ -145,14 +146,21 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string, retr
 					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("SetOrderStatus error")
 					return
 				}
-				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals result")
+				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals processed")
 				return
-			default:
-				// будем повторять на других статусах
-				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Str("accrual status", string(resp.JSON200.Status)).Msg("SetOrderStatus error")
-				go s.GetAccruals(ctx, orderID, retryNum+1)
-				return
+			case Accrual.ResponseStatusREGISTERED:
+				err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusPROCESSING, 0.0)
+				if err != nil {
+					log.Err(err).Str("orderID", orderID).Int("retryNum", retryNum).Msg("SetOrderStatus error")
+					return
+				}
+				log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Float32("accrual", *resp.JSON200.Accrual).Msg("GetAccruals request registered")
 			}
+			// будем повторять на других статусах
+			log.Info().Str("orderID", orderID).Int("retryNum", retryNum).Str("accrual status", string(resp.JSON200.Status)).Msg("GetAccruals in progress")
+			time.Sleep(50 * time.Millisecond) // TODO конфиг
+			go s.GetAccruals(ctx, orderID, retryNum+1)
+			return
 		}
 	}
 }
