@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,19 +30,34 @@ var user = RegisterRequest{
 
 func newRouter(t *testing.T) *chi.Mux {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	accrualMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/orders/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		orderID := strings.Replace(r.URL.Path, "/api/orders/", "", 1)
+
 		var accrual float32 = 50.0
+		status := Accrual.ResponseStatusPROCESSED
+		if orderID == "999999998" {
+			status = Accrual.ResponseStatusINVALID
+		}
+
+		if orderID == "888888880" {
+			status = Accrual.ResponseStatusPROCESSING
+		}
+
 		resp := Accrual.Response{
 			Accrual: &accrual,
-			Order:   "1",
-			Status:  Accrual.ResponseStatusPROCESSED,
+			Order:   Accrual.Order(orderID),
+			Status:  status,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 
-	accrualClient, err := Accrual.NewClientWithResponses(server.URL)
+	accrualClient, err := Accrual.NewClientWithResponses(accrualMockServer.URL)
 	require.NoError(t, err)
 	return httpcontroller.NewRouter(gophermartservice.NewWithMemStorage(accrualClient))
 }
@@ -286,6 +302,52 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		e.GET("/api/user/orders").
 			Expect().
 			Status(http.StatusNoContent)
+	})
+
+	t.Run("accrual invalid", func(t *testing.T) {
+		server := httptest.NewServer(newRouter(t))
+		defer server.Close()
+		e := httpexpect.New(t, server.URL)
+
+		register(t, e, user)
+		uploadOrder(t, e, "999999998") // invalid in mock
+
+		assert.Eventually(t, func() bool {
+			e.GET("/api/user/orders").
+				Expect().
+				Status(http.StatusOK).JSON().
+				Array().
+				Element(0).
+				Object().
+				Value("status").
+				Equal("INVALID")
+			return true
+		}, 2*time.Second, 10*time.Millisecond)
+
+		assertBalance(t, e, 0.0, 0.0)
+	})
+
+	t.Run("accrual processing", func(t *testing.T) {
+		server := httptest.NewServer(newRouter(t))
+		defer server.Close()
+		e := httpexpect.New(t, server.URL)
+
+		register(t, e, user)
+		uploadOrder(t, e, "888888880") // infinite processing status in mock
+
+		assert.Eventually(t, func() bool {
+			e.GET("/api/user/orders").
+				Expect().
+				Status(http.StatusOK).JSON().
+				Array().
+				Element(0).
+				Object().
+				Value("status").
+				Equal("NEW")
+			return true
+		}, 2*time.Second, 10*time.Millisecond)
+
+		assertBalance(t, e, 0.0, 0.0)
 	})
 }
 
