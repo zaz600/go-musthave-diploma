@@ -35,7 +35,7 @@ func GetConfig(args []string) *AppConfig {
 	cfg := &AppConfig{}
 	flag.StringVar(&cfg.ServerAddress, "a", getEnvOrDefault("RUN_ADDRESS", defaultServerAddress), "listen address. env: RUN_ADDRESS")
 	flag.StringVar(&cfg.DatabaseDSN, "d", getEnvOrDefault("DATABASE_URI", ""), "PG dsn. env: DATABASE_URI")
-	flag.StringVar(&cfg.DatabaseDSN, "r", getEnvOrDefault("ACCRUAL_SYSTEM_ADDRESS", ""), "accrual address. env: ACCRUAL_SYSTEM_ADDRESS")
+	flag.StringVar(&cfg.AccrualAddress, "r", getEnvOrDefault("ACCRUAL_SYSTEM_ADDRESS", ""), "accrual address. env: ACCRUAL_SYSTEM_ADDRESS")
 	flag.Parse()
 	return cfg
 }
