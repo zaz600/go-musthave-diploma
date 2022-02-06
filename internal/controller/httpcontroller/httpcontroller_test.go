@@ -146,11 +146,6 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		Status(http.StatusUnprocessableEntity)
 
 	e.POST("/api/user/orders").
-		WithText("12345").
-		Expect().
-		Status(http.StatusUnprocessableEntity)
-
-	e.POST("/api/user/orders").
 		WithText("92345678905").
 		Expect().
 		Status(http.StatusAccepted)
@@ -236,7 +231,21 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 
 	json.Value("current").Equal(0.0)
 	json.Value("withdrawn").Equal(0.0)
-	// TODO
+
+	uploadOrder(t, e, "92345678905")
+	uploadOrder(t, e, "346436439")
+
+	assert.Eventually(t, func() bool {
+		json = e.GET("/api/user/balance").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Object()
+
+		json.Value("current").Equal(100.0)
+		json.Value("withdrawn").Equal(0.0)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
@@ -263,20 +272,31 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 		WithText(`{"order": "92345678905", "sum": 751.21}`).
 		Expect().
 		Status(http.StatusPaymentRequired)
-	// TODO
-}
 
-func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
-	t.Helper()
+	uploadOrder(t, e, "92345678905")
+	uploadOrder(t, e, "346436439")
 
-	e.POST("/api/user/register").
-		WithJSON(user).
+	e.POST("/api/user/balance/withdraw").
+		WithText(`{"order": "92345678905", "sum": 751.21}`).
 		Expect().
-		Status(http.StatusOK).
-		ContentType("application/json").
-		Cookie(sessionCookieName).
-		Value().
-		NotEmpty()
+		Status(http.StatusPaymentRequired)
+
+	e.POST("/api/user/balance/withdraw").
+		WithText(`{"order": "92345678905", "sum": 10.50}`).
+		Expect().
+		Status(http.StatusOK)
+
+	assert.Eventually(t, func() bool {
+		json := e.GET("/api/user/balance").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Object()
+
+		json.Value("current").Equal(100.0 - 10.5)
+		json.Value("withdrawn").Equal(10.5)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
 }
 
 func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
@@ -298,6 +318,124 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 	e.GET("/api/user/balance/withdrawals").
 		Expect().
 		Status(http.StatusNoContent)
+
+	uploadOrder(t, e, "92345678905")
+	assert.Eventually(t, func() bool {
+		e.POST("/api/user/balance/withdraw").
+			WithText(`{"order": "92345678905", "sum": 10.50}`).
+			Expect().
+			Status(http.StatusOK)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+
+	assert.Eventually(t, func() bool {
+		e.GET("/api/user/balance/withdrawals").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Array().
+			Length().Equal(1)
+
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+}
+
+//nolint:funlen
+func TestGophermart_SuccessPath(t *testing.T) {
+	user := RegisterRequest{
+		Login:    "foouser",
+		Password: "pass",
+	}
+
+	server := httptest.NewServer(newRouter(t))
+	defer server.Close()
+	e := httpexpect.New(t, server.URL)
+
+	// Регистрируемся
+	e.POST("/api/user/register").
+		WithJSON(user).
+		Expect().
+		Status(http.StatusOK).
+		ContentType("application/json").
+		Cookie(sessionCookieName).
+		Value().
+		NotEmpty()
+
+	// Загружаем заказ
+	e.POST("/api/user/orders").
+		WithText("92345678905").
+		Expect().
+		Status(http.StatusAccepted)
+
+	// заказ обработан
+	assert.Eventually(t, func() bool {
+		json := e.GET("/api/user/orders").
+			Expect().
+			Status(http.StatusOK).
+			ContentType("application/json").
+			JSON()
+
+		json.Array().Length().Equal(1)
+		json.Array().Element(0).Object().Value("status").Equal(orderProcessedStatus)
+
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+
+	// баланс поменялся
+	assert.Eventually(t, func() bool {
+		json := e.GET("/api/user/balance").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Object()
+
+		json.Value("current").Equal(50.0)
+		json.Value("withdrawn").Equal(0.0)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+
+	// Запрашиваем списание
+	e.POST("/api/user/balance/withdraw").
+		WithText(`{"order": "92345678905", "sum": 10.50}`).
+		Expect().
+		Status(http.StatusOK)
+
+	// баланс изменился
+	assert.Eventually(t, func() bool {
+		json := e.GET("/api/user/balance").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Object()
+
+		json.Value("current").Equal(50.0 - 10.5)
+		json.Value("withdrawn").Equal(10.5)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+
+	// отображается одно списание
+	assert.Eventually(t, func() bool {
+		e.GET("/api/user/balance/withdrawals").
+			Expect().
+			Status(http.StatusOK).
+			JSON().
+			Array().
+			Length().Equal(1)
+		return true
+	}, 2*time.Second, 100*time.Millisecond)
+}
+
+func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
+	t.Helper()
+
+	e.POST("/api/user/register").
+		WithJSON(user).
+		Expect().
+		Status(http.StatusOK).
+		ContentType("application/json").
+		Cookie(sessionCookieName).
+		Value().
+		NotEmpty()
 }
 
 func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string) {

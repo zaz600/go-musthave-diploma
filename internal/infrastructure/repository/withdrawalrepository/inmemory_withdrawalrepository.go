@@ -13,18 +13,18 @@ type InmemorWithdrawalRepository struct {
 	userWithdrawals map[string][]*entity.Withdrawal
 }
 
-func (r *InmemorWithdrawalRepository) AddWithdrawal(ctx context.Context, order *entity.Withdrawal) error {
+func (r *InmemorWithdrawalRepository) AddWithdrawal(ctx context.Context, withdrawal *entity.Withdrawal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if o, ok := r.db[order.OrderID]; ok {
-		if o.UID != order.UID {
+	if o, ok := r.db[withdrawal.OrderID]; ok {
+		if o.UID != withdrawal.UID {
 			return ErrWithdrawalOwnedByAnotherUser
 		}
 		return ErrWithdrawalExists
 	}
-	r.db[order.OrderID] = order
-	r.userWithdrawals[order.UID] = append(r.userWithdrawals[order.UID], order)
+	r.db[withdrawal.OrderID] = withdrawal
+	r.userWithdrawals[withdrawal.UID] = append(r.userWithdrawals[withdrawal.UID], withdrawal)
 	return nil
 }
 

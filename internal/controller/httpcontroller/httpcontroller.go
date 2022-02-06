@@ -220,6 +220,12 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 		return
 	}
 
+	err = c.gophermartService.WithdrawalService.UploadWithdrawal(context.TODO(), session.UID, request.Order, float32(request.Sum))
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
@@ -241,7 +247,7 @@ func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *
 		return
 	}
 
-	var resp = Gophermart.UserBalanceWithdrawalsResponse{}
+	var resp Gophermart.UserBalanceWithdrawalsResponse
 	for _, withdrawal := range withdrawals {
 		respWithdrawal := Gophermart.UserBalanceWithdrawal{
 			Order:       withdrawal.OrderID,
