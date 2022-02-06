@@ -174,7 +174,7 @@ func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskC
 	}
 
 	if resp.StatusCode() != 200 {
-		logError(fmt.Errorf("unknown http status %s", resp.JSON200.Status))
+		logError(fmt.Errorf("unknown http status %d", resp.StatusCode()))
 		return getAccrualStatus{next: 50 * time.Millisecond, status: entity.OrderStatusPROCESSING}
 	}
 
