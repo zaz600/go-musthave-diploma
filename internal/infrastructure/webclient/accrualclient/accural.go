@@ -4,10 +4,12 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
+	"go.uber.org/ratelimit"
 )
 
 type GetAccrualResponse struct {
@@ -18,17 +20,16 @@ type GetAccrualResponse struct {
 
 type Client struct {
 	accrualAPIClient Accrual.ClientWithResponsesInterface
-	limitCh          chan bool
+	rateLimiter      ratelimit.Limiter
 }
 
 func (c Client) GetAccrual(ctx context.Context, orderID string) chan *GetAccrualResponse {
 	resultCh := make(chan *GetAccrualResponse)
 	go func() {
-		c.limitCh <- true
+		c.rateLimiter.Take()
 		resp := c.getAccrual(ctx, orderID)
 		resultCh <- resp
 		close(resultCh)
-		<-c.limitCh
 	}()
 	return resultCh
 }
@@ -72,5 +73,6 @@ func (c Client) getAccrual(ctx context.Context, orderID string) *GetAccrualRespo
 }
 
 func New(accrualAPIClient Accrual.ClientWithResponsesInterface) *Client {
-	return &Client{accrualAPIClient: accrualAPIClient, limitCh: make(chan bool, 10)}
+	rl := ratelimit.New(1000, ratelimit.Per(1*time.Minute)) // per second
+	return &Client{accrualAPIClient: accrualAPIClient, rateLimiter: rl}
 }

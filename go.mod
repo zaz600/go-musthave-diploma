@@ -11,11 +11,13 @@ require (
 	github.com/onsi/gomega v1.18.1
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.0
+	go.uber.org/ratelimit v0.2.0
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
 )
 
 require (
 	github.com/ajg/form v1.5.1 // indirect
+	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/andybalholm/brotli v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/structs v1.0.0 // indirect
