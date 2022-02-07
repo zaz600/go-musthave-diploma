@@ -145,8 +145,10 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		logError(err)
 		return
 	default:
-		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.Status, resp.Accrual)
-		logError(err)
+		if resp.Err == nil {
+			err = s.OrderService.SetOrderStatus(ctx, orderID, resp.Status, resp.Accrual)
+			logError(err)
+		}
 	}
 
 	err = s.OrderService.ReScheduleOrderProcessingTask(ctx, orderID, time.Now().Add(next))
