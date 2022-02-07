@@ -18,13 +18,16 @@ import (
 
 const sessionCookieName = "GM_LS_SESSION"
 
+const accrualDefaultRetryInterval = 50 * time.Millisecond
+
 type GophermartService struct {
 	userService       userservice.UserService
 	sessionService    sessionservice.SessionService
 	OrderService      orderservice.OrderService
 	WithdrawalService withdrawalservice.WithdrawalService
 
-	accrualClient *accrualclient.Client
+	accrualClient        *accrualclient.Client
+	accrualRetryInterval time.Duration
 }
 
 func (s GophermartService) SetAuthCookie(w http.ResponseWriter, session *entity.Session) error {
@@ -118,7 +121,6 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 
 	var resp *accrualclient.GetAccrualResponse
-
 	resultCh := s.accrualClient.GetAccrual(ctx, orderID)
 	select {
 	case <-ctx.Done():
@@ -126,15 +128,11 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	case resp = <-resultCh:
 	}
 
-	next := 50 * time.Millisecond
+	next := s.calcNext(resp)
 	if err := resp.Err; err != nil {
 		log.Err(err).Str("orderID", orderID).Msg("error during GetAccrual")
 		if errors.Is(err, accrualclient.ErrFatalError) {
 			return
-		}
-		var errTooManyRequests accrualclient.TooManyRequestsError
-		if errors.As(err, &errTooManyRequests) {
-			next = time.Duration(errTooManyRequests.RetryAfterSec) * time.Second
 		}
 	}
 
@@ -164,8 +162,22 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 }
 
+func (s GophermartService) calcNext(resp *accrualclient.GetAccrualResponse) time.Duration {
+	next := s.accrualRetryInterval
+	if err := resp.Err; err != nil {
+		var errTooManyRequests accrualclient.TooManyRequestsError
+		if errors.As(err, &errTooManyRequests) {
+			next = time.Duration(errTooManyRequests.RetryAfterSec) * time.Second
+		}
+	}
+	return next
+}
+
 func New(accrualAPIClient Accrual.ClientWithResponsesInterface, opts ...Option) *GophermartService {
-	s := &GophermartService{accrualClient: accrualclient.New(accrualAPIClient)}
+	s := &GophermartService{
+		accrualClient:        accrualclient.New(accrualAPIClient),
+		accrualRetryInterval: accrualDefaultRetryInterval,
+	}
 	for _, opt := range opts {
 		opt(s)
 	}

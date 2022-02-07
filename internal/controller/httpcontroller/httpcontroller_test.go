@@ -17,6 +17,7 @@ import (
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
+	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
 )
 
 const (
@@ -24,9 +25,11 @@ const (
 	orderProcessedStatus = "PROCESSED"
 )
 
-var user = RegisterRequest{
-	Login:    "foouser",
-	Password: "pass",
+func NewUser() RegisterRequest {
+	return RegisterRequest{
+		Login:    random.String(5),
+		Password: random.String(6),
+	}
 }
 
 func newRouter(t *testing.T) *chi.Mux {
@@ -77,11 +80,16 @@ func newRouter(t *testing.T) *chi.Mux {
 
 	accrualClient, err := Accrual.NewClientWithResponses(accrualMockServer.URL)
 	require.NoError(t, err)
-	return httpcontroller.NewRouter(gophermartservice.New(accrualClient, gophermartservice.WithStorage(gophermartservice.Memory)))
+	service := gophermartservice.New(accrualClient,
+		gophermartservice.WithStorage(gophermartservice.Memory),
+		gophermartservice.WithAccrualRetryInterval(20*time.Millisecond),
+	)
+	return httpcontroller.NewRouter(service)
 }
 
 func TestGophermartController_UserRegister(t *testing.T) {
 	t.Run("success registration", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -107,6 +115,7 @@ func TestGophermartController_UserRegister(t *testing.T) {
 	})
 
 	t.Run("duplicate registration", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -122,6 +131,7 @@ func TestGophermartController_UserRegister(t *testing.T) {
 
 func TestGophermartController_UserLogin(t *testing.T) {
 	t.Run("success login", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -151,6 +161,7 @@ func TestGophermartController_UserLogin(t *testing.T) {
 	})
 
 	t.Run("unknown user", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -162,6 +173,7 @@ func TestGophermartController_UserLogin(t *testing.T) {
 	})
 
 	t.Run("wrong password", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -180,6 +192,7 @@ func TestGophermartController_UserLogin(t *testing.T) {
 //nolint:funlen
 func TestGophermartController_UploadOrder(t *testing.T) {
 	t.Run("success upload order", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -193,6 +206,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 	})
 
 	t.Run("user upload same order", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -207,6 +221,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 	})
 
 	t.Run("another user upload same order", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -215,10 +230,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		uploadOrder(t, e, "92345678905")
 
 		// второй юзер
-		user2 := RegisterRequest{
-			Login:    "baruser",
-			Password: "pass",
-		}
+		user2 := NewUser()
 		e2 := httpexpect.New(t, server.URL)
 		register(t, e2, user2)
 
@@ -244,6 +256,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 	})
 
 	t.Run("bad request", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -256,6 +269,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 	})
 
 	t.Run("invalid order", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -276,6 +290,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 //nolint:funlen
 func TestGophermartController_GetUserOrders(t *testing.T) {
 	t.Run("success get user orders", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -314,6 +329,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 	})
 
 	t.Run("no orders", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -326,6 +342,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 	})
 
 	t.Run("accrual invalid", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -350,6 +367,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 	})
 
 	t.Run("accrual processing", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -378,6 +396,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 
 func TestGophermartController_GetUserBalance(t *testing.T) {
 	t.Run("balance changed after upload order", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -413,6 +432,7 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 //nolint:funlen
 func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 	t.Run("success balance withdraw", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -441,6 +461,7 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 	})
 
 	t.Run("invalid request", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -458,6 +479,7 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 	})
 
 	t.Run("insufficient funds", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -483,6 +505,7 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 
 func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 	t.Run("success get user withdrawals", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -522,6 +545,7 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 	})
 
 	t.Run("no withdrawals", func(t *testing.T) {
+		user := NewUser()
 		server := httptest.NewServer(newRouter(t))
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
@@ -536,6 +560,7 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 
 //nolint:funlen
 func TestGophermart_SuccessPath(t *testing.T) {
+	user := NewUser()
 	server := httptest.NewServer(newRouter(t))
 	defer server.Close()
 	e := httpexpect.New(t, server.URL)

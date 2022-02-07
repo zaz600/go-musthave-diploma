@@ -1,6 +1,8 @@
 package gophermartservice
 
 import (
+	"time"
+
 	"github.com/rs/zerolog/log"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
@@ -32,5 +34,11 @@ func WithStorage(storageType StorageType) Option {
 		default:
 			log.Panic().Msg("unsupported storage type")
 		}
+	}
+}
+
+func WithAccrualRetryInterval(interval time.Duration) Option {
+	return func(s *GophermartService) {
+		s.accrualRetryInterval = interval
 	}
 }
