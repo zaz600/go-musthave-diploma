@@ -3,6 +3,7 @@ package orderrepository
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 )
@@ -32,6 +33,30 @@ func (r *InmemoryOrderRepository) UpdateOrder(_ context.Context, order *entity.O
 
 	r.db[order.OrderID] = order
 	return nil
+}
+
+func (r *InmemoryOrderRepository) SetOrderStatusAndAccrual(_ context.Context, orderID string, status entity.OrderStatus, accrual float32) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if order, ok := r.db[orderID]; ok {
+		order.Status = status
+		order.Accrual = accrual
+		return nil
+	}
+	return ErrOrderNotFound
+}
+
+func (r *InmemoryOrderRepository) SetOrderNextRetryAt(_ context.Context, orderID string, nextRetryAt time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if order, ok := r.db[orderID]; ok {
+		order.Context.RetryCount++
+		order.Context.NextRetryAt = nextRetryAt
+		return nil
+	}
+	return ErrOrderNotFound
 }
 
 func (r *InmemoryOrderRepository) GetUserOrders(_ context.Context, userID string) ([]*entity.Order, error) {

@@ -56,13 +56,7 @@ func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Or
 }
 
 func (s Service) SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error {
-	order, err := s.orderRepository.GetOrder(ctx, orderID)
-	if err != nil {
-		return err
-	}
-	order.Status = status
-	order.Accrual = accrual
-	return s.orderRepository.UpdateOrder(ctx, order)
+	return s.orderRepository.SetOrderStatusAndAccrual(ctx, orderID, status, accrual)
 }
 
 func (s Service) GetOrder(ctx context.Context, orderID string) (*entity.Order, error) {
@@ -70,13 +64,7 @@ func (s Service) GetOrder(ctx context.Context, orderID string) (*entity.Order, e
 }
 
 func (s Service) ReScheduleOrderProcessingTask(ctx context.Context, orderID string, next time.Time) error {
-	order, err := s.orderRepository.GetOrder(ctx, orderID)
-	if err != nil {
-		return err
-	}
-	order.Context.RetryCount++
-	order.Context.NextRetryAt = next
-	return s.orderRepository.UpdateOrder(ctx, order)
+	return s.orderRepository.SetOrderNextRetryAt(ctx, orderID, next)
 }
 
 func NewService(orderRepository orderrepository.OrderRepository) *Service {
