@@ -36,7 +36,7 @@ func Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	service := gophermartservice.NewWithMemStorage(accrualClient)
+	service := gophermartservice.New(accrualClient, gophermartservice.WithStorage(gophermartservice.Memory))
 	server := httpserver.New(httpcontroller.NewRouter(service), httpserver.WithAddr(cfg.ServerAddress))
 
 	go func() {

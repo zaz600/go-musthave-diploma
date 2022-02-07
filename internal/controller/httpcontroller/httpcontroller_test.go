@@ -77,7 +77,7 @@ func newRouter(t *testing.T) *chi.Mux {
 
 	accrualClient, err := Accrual.NewClientWithResponses(accrualMockServer.URL)
 	require.NoError(t, err)
-	return httpcontroller.NewRouter(gophermartservice.NewWithMemStorage(accrualClient))
+	return httpcontroller.NewRouter(gophermartservice.New(accrualClient, gophermartservice.WithStorage(gophermartservice.Memory)))
 }
 
 func TestGophermartController_UserRegister(t *testing.T) {

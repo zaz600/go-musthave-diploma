@@ -2,18 +2,14 @@ package gophermartservice
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/withdrawalrepository"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/webclient/accrualclient"
 	"github.com/zaz600/go-musthave-diploma/internal/service/orderservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/sessionservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
@@ -28,7 +24,7 @@ type GophermartService struct {
 	OrderService      orderservice.OrderService
 	WithdrawalService withdrawalservice.WithdrawalService
 
-	accrualClient Accrual.ClientWithResponsesInterface
+	accrualClient *accrualclient.Client
 }
 
 func (s GophermartService) SetAuthCookie(w http.ResponseWriter, session *entity.Session) error {
@@ -99,6 +95,7 @@ func (s GophermartService) GetUserBalance(ctx context.Context, userID string) (f
 	return balance - withdrawalsSum, withdrawalsSum, nil
 }
 
+//nolint:funlen
 func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	order, err := s.OrderService.GetOrder(ctx, orderID)
 	if err != nil {
@@ -120,22 +117,38 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		return
 	}
 
-	resp := s.getAccrual(ctx, orderID, &taskContext)
-	switch resp.status {
-	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID:
-		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Float32("accrual", resp.accrual).Msg("GetAccruals completed")
-		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
-		logError(err)
+	var resp *accrualclient.GetAccrualResponse
+
+	resultCh := s.accrualClient.GetAccrual(ctx, orderID)
+	select {
+	case <-ctx.Done():
 		return
-	default:
-		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.status, resp.accrual)
-		logError(err)
+	case resp = <-resultCh:
 	}
 
 	next := 50 * time.Millisecond
-	if resp.retryAfterSec > 0 {
-		next = time.Duration(resp.retryAfterSec) * time.Second
+	if err := resp.Err; err != nil {
+		log.Err(err).Str("orderID", orderID).Msg("error during GetAccrual")
+		if errors.Is(err, accrualclient.ErrFatalError) {
+			return
+		}
+		var errTooManyRequests accrualclient.TooManyRequestsError
+		if errors.As(err, &errTooManyRequests) {
+			next = time.Duration(errTooManyRequests.RetryAfterSec) * time.Second
+		}
 	}
+
+	switch resp.Status {
+	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID:
+		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
+		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.Status, resp.Accrual)
+		logError(err)
+		return
+	default:
+		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.Status, resp.Accrual)
+		logError(err)
+	}
+
 	err = s.OrderService.ReScheduleOrderProcessingTask(ctx, orderID, time.Now().Add(next))
 	logError(err)
 
@@ -149,67 +162,10 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 }
 
-type getAccrualStatus struct {
-	status        entity.OrderStatus
-	retryAfterSec int
-	accrual       float32
-}
-
-//nolint:funlen
-func (s GophermartService) getAccrual(ctx context.Context, orderID string, taskContext *entity.TaskContext) getAccrualStatus {
-	logError := func(err error) {
-		if err != nil {
-			log.Err(err).Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("error during getAccrual occurred")
-		}
+func New(accrualAPIClient Accrual.ClientWithResponsesInterface, opts ...Option) *GophermartService {
+	s := &GophermartService{accrualClient: accrualclient.New(accrualAPIClient)}
+	for _, opt := range opts {
+		opt(s)
 	}
-
-	resp, err := s.accrualClient.GetOrderAccrualWithResponse(ctx, Accrual.Order(orderID))
-	if err != nil {
-		logError(err)
-		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
-	}
-
-	if resp.StatusCode() == http.StatusTooManyRequests {
-		retryAfter := resp.HTTPResponse.Header.Get("Retry-After")
-		retryAfterSec, err := strconv.Atoi(retryAfter)
-		if err != nil {
-			retryAfterSec = 5
-		}
-		return getAccrualStatus{retryAfterSec: retryAfterSec, status: entity.OrderStatusPROCESSING}
-	}
-
-	if resp.StatusCode() != 200 {
-		logError(fmt.Errorf("unknown http status %d", resp.StatusCode()))
-		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
-	}
-
-	log.Info().
-		Str("orderID", orderID).
-		Int("retryCount", taskContext.RetryCount).
-		Str("accrualStatus", string(resp.JSON200.Status)).
-		Float32("accrual", *resp.JSON200.Accrual).
-		Msg("get accrual result")
-
-	switch resp.JSON200.Status {
-	case Accrual.ResponseStatusINVALID:
-		return getAccrualStatus{accrual: 0.0, status: entity.OrderStatusINVALID}
-	case Accrual.ResponseStatusPROCESSED:
-		return getAccrualStatus{accrual: *resp.JSON200.Accrual, status: entity.OrderStatusPROCESSED}
-	case Accrual.ResponseStatusREGISTERED:
-		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
-	case Accrual.ResponseStatusPROCESSING:
-		return getAccrualStatus{status: entity.OrderStatusPROCESSING}
-	}
-	logError(fmt.Errorf("unknown accrual status %s", resp.JSON200.Status))
-	return getAccrualStatus{status: entity.OrderStatusPROCESSING}
-}
-
-func NewWithMemStorage(accrualClient Accrual.ClientWithResponsesInterface) *GophermartService {
-	return &GophermartService{
-		accrualClient:     accrualClient,
-		userService:       userservice.NewService(userrepository.NewInmemoryUserRepository()),
-		sessionService:    sessionservice.NewService(sessionrepository.NewInmemorySessionRepository()),
-		OrderService:      orderservice.NewService(orderrepository.NewInmemoryOrderRepository()),
-		WithdrawalService: withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository()),
-	}
+	return s
 }
