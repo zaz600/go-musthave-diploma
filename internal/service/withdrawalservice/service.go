@@ -9,7 +9,7 @@ import (
 
 type WithdrawalService interface {
 	UploadWithdrawal(ctx context.Context, userID string, orderID string, sum float32) error
-	GetUserWithdrawals(ctx context.Context, userID string) ([]*entity.Withdrawal, error)
+	GetUserWithdrawals(ctx context.Context, userID string) ([]entity.Withdrawal, error)
 }
 
 type Service struct {
@@ -18,10 +18,10 @@ type Service struct {
 
 func (s *Service) UploadWithdrawal(ctx context.Context, userID string, orderID string, sum float32) error {
 	withdrawal := entity.NewWithdrawal(userID, orderID, sum)
-	return s.withdrawalRepository.AddWithdrawal(ctx, withdrawal)
+	return s.withdrawalRepository.AddWithdrawal(ctx, *withdrawal)
 }
 
-func (s *Service) GetUserWithdrawals(ctx context.Context, userID string) ([]*entity.Withdrawal, error) {
+func (s *Service) GetUserWithdrawals(ctx context.Context, userID string) ([]entity.Withdrawal, error) {
 	return s.withdrawalRepository.GetUserWithdrawals(ctx, userID)
 }
 

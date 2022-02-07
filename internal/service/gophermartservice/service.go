@@ -76,15 +76,9 @@ func (s GophermartService) LoginUser(ctx context.Context, login string, password
 }
 
 func (s GophermartService) GetUserBalance(ctx context.Context, userID string) (float32, float32, error) {
-	orders, err := s.OrderService.GetUserOrders(ctx, userID)
+	balance, err := s.OrderService.GetUserAccrual(ctx, userID)
 	if err != nil {
 		return 0, 0, err
-	}
-	var balance float32
-	for _, order := range orders {
-		if order.Status == entity.OrderStatusPROCESSED {
-			balance += order.Accrual
-		}
 	}
 
 	var withdrawalsSum float32

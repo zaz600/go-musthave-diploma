@@ -14,10 +14,11 @@ import (
 
 type OrderService interface {
 	UploadOrder(ctx context.Context, userID string, orderID string) error
-	GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error)
+	GetUserOrders(ctx context.Context, userID string) ([]entity.Order, error)
+	GetUserAccrual(ctx context.Context, userID string) (float32, error)
 	SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error
 	ReScheduleOrderProcessingTask(ctx context.Context, orderID string, next time.Time) error
-	GetOrder(ctx context.Context, orderID string) (*entity.Order, error)
+	GetOrder(ctx context.Context, orderID string) (entity.Order, error)
 }
 
 type Service struct {
@@ -29,7 +30,7 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 		return ErrInvalidOrderFormat
 	}
 
-	order := entity.NewOrder(userID, orderID)
+	order := *entity.NewOrder(userID, orderID)
 	err := s.orderRepository.AddOrder(ctx, order)
 	if err != nil {
 		if errors.Is(err, orderrepository.ErrOrderExists) {
@@ -43,7 +44,7 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 	return nil
 }
 
-func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Order, error) {
+func (s Service) GetUserOrders(ctx context.Context, userID string) ([]entity.Order, error) {
 	// TODO обработать ошибки и завернуть их
 	orders, err := s.orderRepository.GetUserOrders(ctx, userID)
 	if err != nil {
@@ -55,11 +56,15 @@ func (s Service) GetUserOrders(ctx context.Context, userID string) ([]*entity.Or
 	return orders, nil
 }
 
+func (s Service) GetUserAccrual(ctx context.Context, userID string) (float32, error) {
+	return s.orderRepository.GetUserAccrual(ctx, userID)
+}
+
 func (s Service) SetOrderStatus(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error {
 	return s.orderRepository.SetOrderStatusAndAccrual(ctx, orderID, status, accrual)
 }
 
-func (s Service) GetOrder(ctx context.Context, orderID string) (*entity.Order, error) {
+func (s Service) GetOrder(ctx context.Context, orderID string) (entity.Order, error) {
 	return s.orderRepository.GetOrder(ctx, orderID)
 }
 
