@@ -45,18 +45,18 @@ func (s GophermartService) SetJWT(w http.ResponseWriter, session *entity.Session
 	return nil
 }
 
-func (s GophermartService) GetSession(r *http.Request) (*entity.Session, error) {
+func (s GophermartService) GetUserID(r *http.Request) (string, error) {
 	for _, cookie := range r.Cookies() {
 		if cookie.Name == sessionCookieName {
 			jwtToken := cookie.Value
 			claims, err := auth.GetUserClaims(jwtToken)
 			if err != nil {
-				return nil, err
+				return "", err
 			}
-			return s.sessionService.Get(context.TODO(), claims.SessionID)
+			return claims.UserID, nil
 		}
 	}
-	return nil, ErrSessionNotFounf
+	return "", ErrUserNotFound
 }
 
 func (s GophermartService) RegisterUser(ctx context.Context, login string, password string) (*entity.Session, error) {

@@ -22,7 +22,7 @@ import (
 type key int
 
 const (
-	sessionKey key = iota
+	userIDKey key = iota
 )
 
 var _ Gophermart.ServerInterface = &GophermartController{}
@@ -91,7 +91,7 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
@@ -104,8 +104,8 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 	}
 	orderID := string(bytes)
 
-	log.Info().Str("uid", session.UID).Str("orderID", orderID).Msg("UploadOrder")
-	err = c.gophermartService.OrderService.UploadOrder(context.TODO(), session.UID, orderID)
+	log.Info().Str("uid", userID).Str("orderID", orderID).Msg("UploadOrder")
+	err = c.gophermartService.OrderService.UploadOrder(context.TODO(), userID, orderID)
 	if err != nil {
 		if errors.Is(err, orderservice.ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
@@ -130,13 +130,13 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 }
 
 func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	orders, err := c.gophermartService.OrderService.GetUserOrders(context.TODO(), session.UID)
+	orders, err := c.gophermartService.OrderService.GetUserOrders(context.TODO(), userID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -171,13 +171,13 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	currentBalance, withdrawalsSum, err := c.gophermartService.GetUserBalance(context.TODO(), session.UID)
+	currentBalance, withdrawalsSum, err := c.gophermartService.GetUserBalance(context.TODO(), userID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -193,7 +193,7 @@ func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Req
 }
 
 func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
@@ -210,7 +210,7 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 		return
 	}
 
-	currentBalance, _, err := c.gophermartService.GetUserBalance(context.TODO(), session.UID)
+	currentBalance, _, err := c.gophermartService.GetUserBalance(context.TODO(), userID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -220,7 +220,7 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = c.gophermartService.WithdrawalService.UploadWithdrawal(context.TODO(), session.UID, request.Order, float32(request.Sum))
+	err = c.gophermartService.WithdrawalService.UploadWithdrawal(context.TODO(), userID, request.Order, float32(request.Sum))
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -231,13 +231,13 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 }
 
 func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *http.Request) {
-	session, ok := r.Context().Value(sessionKey).(*entity.Session)
+	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok {
 		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 
-	withdrawals, err := c.gophermartService.WithdrawalService.GetUserWithdrawals(context.TODO(), session.UID)
+	withdrawals, err := c.gophermartService.WithdrawalService.GetUserWithdrawals(context.TODO(), userID)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -292,12 +292,12 @@ func NewRouter(gophermartService *gophermartservice.GophermartService) *chi.Mux 
 
 func (c GophermartController) AuthCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := c.gophermartService.GetSession(r)
+		userID, err := c.gophermartService.GetUserID(r)
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ctx := context.WithValue(r.Context(), sessionKey, session)
+		ctx := context.WithValue(r.Context(), userIDKey, userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

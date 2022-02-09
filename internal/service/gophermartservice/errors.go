@@ -2,4 +2,4 @@ package gophermartservice
 
 import "errors"
 
-var ErrSessionNotFounf = errors.New("session not found")
+var ErrUserNotFound = errors.New("user not found")

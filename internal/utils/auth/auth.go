@@ -20,7 +20,7 @@ func CreateToken(userID string, sessionID string) (string, error) {
 		UserID:    userID,
 		SessionID: sessionID,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: 30 * 24 * 60 * 60 * 1000,
+			ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
 			Issuer:    "Gophermart",
 		},
 	}
