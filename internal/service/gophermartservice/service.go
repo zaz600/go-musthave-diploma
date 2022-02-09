@@ -46,17 +46,16 @@ func (s GophermartService) SetJWT(w http.ResponseWriter, session *entity.Session
 }
 
 func (s GophermartService) GetUserID(r *http.Request) (string, error) {
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == sessionCookieName {
-			jwtToken := cookie.Value
-			claims, err := auth.GetUserClaims(jwtToken)
-			if err != nil {
-				return "", err
-			}
-			return claims.UserID, nil
-		}
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil {
+		return "", ErrUserNotFound
 	}
-	return "", ErrUserNotFound
+	jwtToken := cookie.Value
+	claims, err := auth.GetUserClaims(jwtToken)
+	if err != nil {
+		return "", err
+	}
+	return claims.UserID, nil
 }
 
 func (s GophermartService) RegisterUser(ctx context.Context, login string, password string) (*entity.Session, error) {
