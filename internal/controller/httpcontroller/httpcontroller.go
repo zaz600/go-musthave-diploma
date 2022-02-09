@@ -49,7 +49,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	err = c.gophermartService.SetAuthCookie(w, session)
+	err = c.gophermartService.SetJWT(w, session)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -79,7 +79,7 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = c.gophermartService.SetAuthCookie(w, session)
+	err = c.gophermartService.SetJWT(w, session)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

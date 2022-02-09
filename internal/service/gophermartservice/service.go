@@ -14,6 +14,7 @@ import (
 	"github.com/zaz600/go-musthave-diploma/internal/service/sessionservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
 	"github.com/zaz600/go-musthave-diploma/internal/service/withdrawalservice"
+	"github.com/zaz600/go-musthave-diploma/internal/utils/auth"
 )
 
 const sessionCookieName = "GM_LS_SESSION"
@@ -30,11 +31,16 @@ type GophermartService struct {
 	accrualRetryInterval time.Duration
 }
 
-func (s GophermartService) SetAuthCookie(w http.ResponseWriter, session *entity.Session) error {
+func (s GophermartService) SetJWT(w http.ResponseWriter, session *entity.Session) error {
+	jwtToken, err := auth.CreateToken(session.UID, session.SessionID)
+	if err != nil {
+		return err
+	}
 	cookie := &http.Cookie{
 		Name:  sessionCookieName,
-		Value: session.SessionID, // TODO подписать
+		Value: jwtToken,
 	}
+	// TODO в реале лучше класть не в куку, а в хидер
 	http.SetCookie(w, cookie)
 	return nil
 }
@@ -42,8 +48,12 @@ func (s GophermartService) SetAuthCookie(w http.ResponseWriter, session *entity.
 func (s GophermartService) GetSession(r *http.Request) (*entity.Session, error) {
 	for _, cookie := range r.Cookies() {
 		if cookie.Name == sessionCookieName {
-			sessionID := cookie.Value // TODO validate
-			return s.sessionService.Get(context.TODO(), sessionID)
+			jwtToken := cookie.Value
+			claims, err := auth.GetUserClaims(jwtToken)
+			if err != nil {
+				return nil, err
+			}
+			return s.sessionService.Get(context.TODO(), claims.SessionID)
 		}
 	}
 	return nil, ErrSessionNotFounf
