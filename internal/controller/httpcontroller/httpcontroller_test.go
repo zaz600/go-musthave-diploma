@@ -21,7 +21,6 @@ import (
 )
 
 const (
-	sessionCookieName    = "GM_LS_SESSION"
 	orderProcessedStatus = "PROCESSED"
 )
 
@@ -99,8 +98,7 @@ func TestGophermartController_UserRegister(t *testing.T) {
 			Expect().
 			Status(http.StatusOK).
 			ContentType("application/json").
-			Cookie(sessionCookieName).
-			Value().
+			Headers().ContainsKey("Authorization").
 			NotEmpty()
 	})
 
@@ -120,10 +118,11 @@ func TestGophermartController_UserRegister(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/register").
 			WithJSON(user).
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusConflict)
 	})
@@ -145,8 +144,7 @@ func TestGophermartController_UserLogin(t *testing.T) {
 			Expect().
 			Status(http.StatusOK).
 			ContentType("application/json").
-			Cookie(sessionCookieName).
-			Value().
+			Headers().ContainsKey("Authorization").
 			NotEmpty()
 	})
 
@@ -197,9 +195,10 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/orders").
+			WithHeader("Authorization", token).
 			WithText("92345678905").
 			Expect().
 			Status(http.StatusAccepted)
@@ -211,10 +210,11 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
-		uploadOrder(t, e, "92345678905")
+		token := register(t, e, user)
+		uploadOrder(t, e, "92345678905", token)
 
 		e.POST("/api/user/orders").
+			WithHeader("Authorization", token).
 			WithText("92345678905").
 			Expect().
 			Status(http.StatusOK)
@@ -226,15 +226,16 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
-		uploadOrder(t, e, "92345678905")
+		token := register(t, e, user)
+		uploadOrder(t, e, "92345678905", token)
 
 		// второй юзер
 		user2 := NewUser()
 		e2 := httpexpect.New(t, server.URL)
-		register(t, e2, user2)
+		token2 := register(t, e2, user2)
 
 		e2.POST("/api/user/orders").
+			WithHeader("Authorization", token2).
 			WithText("92345678905").
 			Expect().
 			Status(http.StatusConflict)
@@ -250,7 +251,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 			Status(http.StatusUnauthorized)
 
 		e.POST("/api/user/orders").
-			WithCookie(sessionCookieName, "123456").
+			WithHeader("Authorization", "1234").
 			Expect().
 			Status(http.StatusUnauthorized)
 	})
@@ -261,9 +262,10 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/orders").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusBadRequest)
 	})
@@ -274,13 +276,15 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/orders").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusBadRequest)
 
 		e.POST("/api/user/orders").
+			WithHeader("Authorization", token).
 			WithText("12345").
 			Expect().
 			Status(http.StatusUnprocessableEntity)
@@ -295,15 +299,16 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
-		uploadOrder(t, e, "92345678905")
-		uploadOrder(t, e, "12345678903")
-		uploadOrder(t, e, "346436439")
+		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, "12345678903", token)
+		uploadOrder(t, e, "346436439", token)
 
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
 			orders := e.GET("/api/user/orders").
+				WithHeader("Authorization", token).
 				Expect().
 				Status(http.StatusOK).
 				ContentType("application/json").
@@ -334,9 +339,10 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.GET("/api/user/orders").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusNoContent)
 	})
@@ -347,12 +353,13 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
-		uploadOrder(t, e, "999999998") // invalid in mock
+		token := register(t, e, user)
+		uploadOrder(t, e, "999999998", token) // invalid in mock
 
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
 			order := e.GET("/api/user/orders").
+				WithHeader("Authorization", token).
 				Expect().
 				Status(http.StatusOK).JSON().
 				Array().
@@ -363,7 +370,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 			g.Expect(order.Value("status").String().Raw()).Should(Equal("INVALID"))
 		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 
-		assertBalance(t, e, 0.0, 0.0)
+		assertBalance(t, e, 0.0, 0.0, token)
 	})
 
 	t.Run("accrual processing", func(t *testing.T) {
@@ -372,14 +379,15 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 		// Этот ордер в моке сервиса accrual проходит все статусы обработки, при запросе начислений
-		uploadOrder(t, e, "888888880") // REGISTERED -> PROCESSING -> PROCESSING -> PROCESSED in mock
+		uploadOrder(t, e, "888888880", token) // REGISTERED -> PROCESSING -> PROCESSING -> PROCESSED in mock
 
 		// Ждем, что ордер дойдет до конца обработки и баллы будут начислены
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
 			order := e.GET("/api/user/orders").
+				WithHeader("Authorization", token).
 				Expect().
 				Status(http.StatusOK).JSON().
 				Array().
@@ -390,7 +398,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 			g.Expect(order.Value("status").String().Raw()).Should(Equal(orderProcessedStatus))
 		}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 
-		assertBalance(t, e, 50.0, 0.0)
+		assertBalance(t, e, 50.0, 0.0, token)
 	})
 }
 
@@ -401,9 +409,10 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		balance := e.GET("/api/user/balance").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusOK).
 			JSON().
@@ -412,10 +421,10 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 		balance.Value("current").Equal(0.0)
 		balance.Value("withdrawn").Equal(0.0)
 
-		uploadOrder(t, e, "92345678905")
-		uploadOrder(t, e, "346436439")
+		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, "346436439", token)
 
-		assertBalance(t, e, 100.0, 0)
+		assertBalance(t, e, 100.0, 0, token)
 	})
 
 	t.Run("not authorized", func(t *testing.T) {
@@ -437,17 +446,18 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
-		uploadOrder(t, e, "92345678905")
-		uploadOrder(t, e, "346436439")
-		assertBalance(t, e, 100.0, 0)
+		token := register(t, e, user)
+		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, "346436439", token)
+		assertBalance(t, e, 100.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			WithText(`{"order": "92345678905", "sum": 10.50}`).
 			Expect().
 			Status(http.StatusOK)
 
-		assertBalance(t, e, 100.0-10.5, 10.5)
+		assertBalance(t, e, 100.0-10.5, 10.5, token)
 	})
 
 	t.Run("not authorized", func(t *testing.T) {
@@ -466,13 +476,15 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusBadRequest)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			WithText(`{"order": "92345678905", "sum": 751.21}`).
 			Expect().
 			Status(http.StatusPaymentRequired)
@@ -484,22 +496,24 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			WithText(`{"order": "92345678905", "sum": 751.21}`).
 			Expect().
 			Status(http.StatusPaymentRequired)
 
-		uploadOrder(t, e, "92345678905")
-		uploadOrder(t, e, "346436439")
-		assertBalance(t, e, 100.0, 0)
+		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, "346436439", token)
+		assertBalance(t, e, 100.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			WithText(`{"order": "92345678905", "sum": 751.21}`).
 			Expect().
 			Status(http.StatusPaymentRequired)
-		assertBalance(t, e, 100.0, 0)
+		assertBalance(t, e, 100.0, 0, token)
 	})
 }
 
@@ -510,12 +524,13 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
-		uploadOrder(t, e, "92345678905")
-		assertBalance(t, e, 50.0, 0)
+		uploadOrder(t, e, "92345678905", token)
+		assertBalance(t, e, 50.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
+			WithHeader("Authorization", token).
 			WithText(`{"order": "92345678905", "sum": 10.50}`).
 			Expect().
 			Status(http.StatusOK)
@@ -523,6 +538,7 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
 			withdrawals := e.GET("/api/user/balance/withdrawals").
+				WithHeader("Authorization", token).
 				Expect().
 				Status(http.StatusOK).
 				JSON().
@@ -550,9 +566,10 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
-		register(t, e, user)
+		token := register(t, e, user)
 
 		e.GET("/api/user/balance/withdrawals").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusNoContent)
 	})
@@ -566,17 +583,11 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	e := httpexpect.New(t, server.URL)
 
 	// Регистрируемся
-	e.POST("/api/user/register").
-		WithJSON(user).
-		Expect().
-		Status(http.StatusOK).
-		ContentType("application/json").
-		Cookie(sessionCookieName).
-		Value().
-		NotEmpty()
+	token := register(t, e, user)
 
 	// Загружаем заказ
 	e.POST("/api/user/orders").
+		WithHeader("Authorization", token).
 		WithText("92345678905").
 		Expect().
 		Status(http.StatusAccepted)
@@ -584,6 +595,7 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	g := NewGomegaWithT(t)
 	g.Eventually(func(g Gomega) {
 		orders := e.GET("/api/user/orders").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusOK).
 			ContentType("application/json").
@@ -597,19 +609,21 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 
 	// баланс поменялся
-	assertBalance(t, e, 50.0, 0.0)
+	assertBalance(t, e, 50.0, 0.0, token)
 
 	// Запрашиваем списание
 	e.POST("/api/user/balance/withdraw").
+		WithHeader("Authorization", token).
 		WithText(`{"order": "92345678905", "sum": 10.50}`).
 		Expect().
 		Status(http.StatusOK)
 
 	// баланс изменился
-	assertBalance(t, e, 50.0-10.5, 10.5)
+	assertBalance(t, e, 50.0-10.5, 10.5, token)
 
 	g.Eventually(func(g Gomega) {
 		withdrawals := e.GET("/api/user/balance/withdrawals").
+			WithHeader("Authorization", token).
 			Expect().
 			Status(http.StatusOK).
 			JSON().
@@ -621,32 +635,34 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond).Should(Succeed())
 }
 
-func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) {
+func register(t *testing.T, e *httpexpect.Expect, user RegisterRequest) string {
 	t.Helper()
 
-	e.POST("/api/user/register").
+	authHeader := e.POST("/api/user/register").
 		WithJSON(user).
 		Expect().
 		Status(http.StatusOK).
 		ContentType("application/json").
-		Cookie(sessionCookieName).
-		Value().
-		NotEmpty()
+		Header("Authorization").NotEmpty().Raw()
+	return authHeader
 }
 
-func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string) {
+func uploadOrder(t *testing.T, e *httpexpect.Expect, orderID string, token string) {
 	t.Helper()
 
 	e.POST("/api/user/orders").
+		WithHeader("Authorization", token).
 		WithText(orderID).
 		Expect().
 		Status(http.StatusAccepted)
 }
 
-func assertBalance(t *testing.T, e *httpexpect.Expect, current float32, withdrawn float32) {
+func assertBalance(t *testing.T, e *httpexpect.Expect, current float32, withdrawn float32, token string) {
 	g := NewGomegaWithT(t)
 	g.Eventually(func(g Gomega) {
-		balance := e.GET("/api/user/balance").Expect().Status(http.StatusOK).JSON().Object()
+		balance := e.GET("/api/user/balance").
+			WithHeader("Authorization", token).
+			Expect().Status(http.StatusOK).JSON().Object()
 		t.Logf("balance response: %#v", balance.Raw())
 
 		g.Expect(balance.Value("current").Number().Raw()).Should(Equal(float64(current)))

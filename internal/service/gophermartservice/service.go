@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -16,8 +17,6 @@ import (
 	"github.com/zaz600/go-musthave-diploma/internal/service/withdrawalservice"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/auth"
 )
-
-const sessionCookieName = "GM_LS_SESSION"
 
 const accrualDefaultRetryInterval = 50 * time.Millisecond
 
@@ -36,21 +35,15 @@ func (s GophermartService) SetJWT(w http.ResponseWriter, session *entity.Session
 	if err != nil {
 		return err
 	}
-	cookie := &http.Cookie{
-		Name:  sessionCookieName,
-		Value: jwtToken,
-	}
-	// TODO в реале лучше класть не в куку, а в хидер
-	http.SetCookie(w, cookie)
+	w.Header().Set("Authorization", "Bearer "+jwtToken)
 	return nil
 }
 
 func (s GophermartService) GetUserID(r *http.Request) (string, error) {
-	cookie, err := r.Cookie(sessionCookieName)
-	if err != nil {
+	jwtToken := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+	if jwtToken == "" {
 		return "", ErrUserNotFound
 	}
-	jwtToken := cookie.Value
 	claims, err := auth.GetUserClaims(jwtToken)
 	if err != nil {
 		return "", err
@@ -165,6 +158,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 }
 
+// calcNext вычисляет через сколько надо повторить запрос
 func (s GophermartService) calcNext(resp *accrualclient.GetAccrualResponse) time.Duration {
 	next := s.accrualRetryInterval
 	if err := resp.Err; err != nil {
