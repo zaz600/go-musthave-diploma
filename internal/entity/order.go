@@ -17,21 +17,16 @@ const (
 	OrderStatusTooManyRetries OrderStatus = "TOO_MANY_RETRIES"
 )
 
-type TaskContext struct {
-	RetryCount  int
-	NextRetryAt time.Time
-}
-
 type Order struct {
 	ID         string
 	UID        string
 	OrderID    string      `json:"number"`
-	UploadedAt int64       `json:"uploaded_at"`
+	UploadedAt time.Time   `json:"uploaded_at"`
 	Status     OrderStatus `json:"status"`
 	// TODO https://github.com/shopspring/decimal
 	Accrual float32 `json:"accrual"`
 
-	Context TaskContext
+	RetryCount int
 }
 
 func NewOrder(userID string, orderID string) *Order {
@@ -39,12 +34,9 @@ func NewOrder(userID string, orderID string) *Order {
 		ID:         random.String(12),
 		UID:        userID,
 		OrderID:    orderID,
-		UploadedAt: time.Now().UnixMilli(),
+		UploadedAt: time.Now(),
 		Status:     OrderStatusNEW,
 		Accrual:    0,
-		Context: TaskContext{
-			RetryCount:  0,
-			NextRetryAt: time.Now(),
-		},
+		RetryCount: 0,
 	}
 }

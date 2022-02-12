@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users
     created_at   TIMESTAMP
 );
 ALTER TABLE users ALTER COLUMN created_at SET DEFAULT now();
-CREATE UNIQUE INDEX login_uniq_idx ON users USING btree (login);
+CREATE UNIQUE INDEX users_login_uniq_idx ON users USING btree (login);
 
 CREATE TABLE IF NOT EXISTS sessions
 (
@@ -23,5 +23,5 @@ CREATE TABLE IF NOT EXISTS sessions
     created_at   TIMESTAMP
 );
 ALTER TABLE sessions ALTER COLUMN created_at SET DEFAULT now();
-CREATE UNIQUE INDEX sid_uniq_idx ON sessions USING btree (sid);
+CREATE UNIQUE INDEX sessions_sid_uniq_idx ON sessions USING btree (sid);
 

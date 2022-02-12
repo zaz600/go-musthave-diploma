@@ -52,6 +52,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 	}
 	err = c.gophermartService.SetJWT(w, session)
 	if err != nil {
+		log.Err(err).Msg("user register error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -76,12 +77,14 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, "invalid login/password", http.StatusUnauthorized)
 			return
 		}
+		log.Err(err).Msg("user login error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
 	err = c.gophermartService.SetJWT(w, session)
 	if err != nil {
+		log.Err(err).Msg("user login error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -120,6 +123,7 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 			http.Error(w, "invalid orderID format, check luhn mismatch", http.StatusUnprocessableEntity)
 			return
 		}
+		log.Err(err).Msg("upload order error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -139,6 +143,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 
 	orders, err := c.gophermartService.OrderService.GetUserOrders(context.TODO(), userID)
 	if err != nil {
+		log.Err(err).Msg("get user orders error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -152,7 +157,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 		respOrder := Gophermart.Order{
 			Number:     order.OrderID,
 			Status:     Gophermart.OrderStatus(order.Status),
-			UploadedAt: time.UnixMilli(order.UploadedAt).Format(time.RFC3339),
+			UploadedAt: order.UploadedAt.Format(time.RFC3339),
 		}
 		if order.Status == entity.OrderStatusPROCESSED {
 			respOrder.Accrual = &order.Accrual
@@ -162,6 +167,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 
 	bytes, err := json.Marshal(resp)
 	if err != nil {
+		log.Err(err).Msg("get user orders error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -180,6 +186,7 @@ func (c *GophermartController) GetUserBalance(w http.ResponseWriter, r *http.Req
 
 	currentBalance, withdrawalsSum, err := c.gophermartService.GetUserBalance(context.TODO(), userID)
 	if err != nil {
+		log.Err(err).Msg("get user balance error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -213,6 +220,7 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 
 	currentBalance, _, err := c.gophermartService.GetUserBalance(context.TODO(), userID)
 	if err != nil {
+		log.Err(err).Msg("user balance withdraw error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -223,6 +231,7 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 
 	err = c.gophermartService.WithdrawalService.UploadWithdrawal(context.TODO(), userID, request.Order, float32(request.Sum))
 	if err != nil {
+		log.Err(err).Msg("user balance withdraw error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -240,6 +249,7 @@ func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *
 
 	withdrawals, err := c.gophermartService.WithdrawalService.GetUserWithdrawals(context.TODO(), userID)
 	if err != nil {
+		log.Err(err).Msg("user balance withdrawals error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -260,6 +270,7 @@ func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *
 
 	bytes, err := json.Marshal(resp)
 	if err != nil {
+		log.Err(err).Msg("user balance withdrawals error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

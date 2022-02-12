@@ -102,15 +102,14 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		return
 	}
 
-	taskContext := order.Context
 	logError := func(err error) {
 		if err != nil {
-			log.Err(err).Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("error during getAccrual occurred")
+			log.Err(err).Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("error during getAccrual occurred")
 		}
 	}
 
-	if taskContext.RetryCount > 5 {
-		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals retry limit")
+	if order.RetryCount > 5 {
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("GetAccruals retry limit")
 		err = s.OrderService.SetOrderStatus(ctx, orderID, entity.OrderStatusTooManyRetries, 0)
 		logError(err)
 		return
@@ -134,7 +133,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 
 	switch resp.Status {
 	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID:
-		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
 		err = s.OrderService.SetOrderStatus(ctx, orderID, resp.Status, resp.Accrual)
 		logError(err)
 		return
@@ -150,7 +149,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 
 	select {
 	case <-ctx.Done():
-		log.Info().Str("orderID", orderID).Int("retryCount", taskContext.RetryCount).Msg("GetAccruals context done")
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("GetAccruals context done")
 		return
 	case <-time.After(next):
 		go s.GetAccruals(ctx, orderID) // решедуллим

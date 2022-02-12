@@ -34,10 +34,14 @@ func (s Service) UploadOrder(ctx context.Context, userID string, orderID string)
 	err := s.orderRepository.AddOrder(ctx, order)
 	if err != nil {
 		if errors.Is(err, orderrepository.ErrOrderExists) {
+			order, err := s.orderRepository.GetOrder(ctx, orderID)
+			if err != nil {
+				return fmt.Errorf("error upload order %s, uid=%s: %w", orderID, userID, err)
+			}
+			if order.UID != userID {
+				return ErrOrderOwnedByAnotherUser
+			}
 			return ErrOrderExists
-		}
-		if errors.Is(err, orderrepository.ErrOrderOwnedByAnotherUser) {
-			return ErrOrderOwnedByAnotherUser
 		}
 		return fmt.Errorf("error upload order %s, uid=%s: %w", orderID, userID, err)
 	}
@@ -51,7 +55,7 @@ func (s Service) GetUserOrders(ctx context.Context, userID string) ([]entity.Ord
 		return nil, err
 	}
 	sort.SliceStable(orders, func(i, j int) bool {
-		return orders[i].UploadedAt < orders[j].UploadedAt
+		return orders[i].UploadedAt.UnixMilli() < orders[j].UploadedAt.UnixMilli()
 	})
 	return orders, nil
 }

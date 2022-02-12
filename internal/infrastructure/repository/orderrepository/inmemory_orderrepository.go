@@ -17,10 +17,7 @@ func (r *InmemoryOrderRepository) AddOrder(_ context.Context, order entity.Order
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if o, ok := r.db[order.OrderID]; ok {
-		if o.UID != order.UID {
-			return ErrOrderOwnedByAnotherUser
-		}
+	if _, ok := r.db[order.OrderID]; ok {
 		return ErrOrderExists
 	}
 	r.db[order.OrderID] = order
@@ -53,8 +50,7 @@ func (r *InmemoryOrderRepository) SetOrderNextRetryAt(_ context.Context, orderID
 	defer r.mu.Unlock()
 
 	if order, ok := r.db[orderID]; ok {
-		order.Context.RetryCount++
-		order.Context.NextRetryAt = nextRetryAt
+		order.RetryCount++
 		return nil
 	}
 	return ErrOrderNotFound
