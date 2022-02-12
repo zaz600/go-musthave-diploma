@@ -8,6 +8,5 @@ import (
 
 type SessionRepository interface {
 	AddSession(ctx context.Context, session *entity.Session) error
-	DelSession(ctx context.Context, sessionID string) error
 	GetSession(ctx context.Context, sessionID string) (*entity.Session, error)
 }

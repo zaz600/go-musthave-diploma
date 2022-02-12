@@ -9,13 +9,13 @@ import (
 type Session struct {
 	UID       string
 	SessionID string
-	CreatedAt int64
+	CreatedAt time.Time
 }
 
 func NewSession(uid string) *Session {
 	return &Session{
 		UID:       uid,
 		SessionID: random.String(32),
-		CreatedAt: time.Now().UnixMilli(),
+		CreatedAt: time.Now(),
 	}
 }

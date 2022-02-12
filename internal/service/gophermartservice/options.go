@@ -30,7 +30,7 @@ func WithMemoryStorage() Option {
 func WithPgStorage(db *sql.DB) Option {
 	return func(s *GophermartService) {
 		s.userService = userservice.NewService(userrepository.NewPgUserRepository(db))
-		s.sessionService = sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
+		s.sessionService = sessionservice.NewService(sessionrepository.NewPgSessionRepository(db))
 		s.OrderService = orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
 		s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository())
 	}

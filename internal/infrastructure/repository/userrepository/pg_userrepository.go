@@ -23,9 +23,9 @@ func (p PgUserRepository) GetUser(ctx context.Context, login string) (entity.Use
 	return user, nil
 }
 
-func (p PgUserRepository) AddUser(ctx context.Context, entity entity.UserEntity) error {
+func (p PgUserRepository) AddUser(ctx context.Context, userEntity entity.UserEntity) error {
 	query := "insert into gophermart.users(uid, login, password) values($1, $2, $3)"
-	_, err := p.db.ExecContext(ctx, query, entity.UID, entity.Login, entity.Password)
+	_, err := p.db.ExecContext(ctx, query, userEntity.UID, userEntity.Login, userEntity.Password)
 	if err != nil {
 		return err
 	}

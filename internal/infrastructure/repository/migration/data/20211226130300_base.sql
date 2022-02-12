@@ -15,3 +15,13 @@ CREATE TABLE IF NOT EXISTS users
 ALTER TABLE users ALTER COLUMN created_at SET DEFAULT now();
 CREATE UNIQUE INDEX login_uniq_idx ON users USING btree (login);
 
+CREATE TABLE IF NOT EXISTS sessions
+(
+    id           serial primary key,
+    uid          varchar ,
+    sid          varchar,
+    created_at   TIMESTAMP
+);
+ALTER TABLE sessions ALTER COLUMN created_at SET DEFAULT now();
+CREATE UNIQUE INDEX sid_uniq_idx ON sessions USING btree (sid);
+
