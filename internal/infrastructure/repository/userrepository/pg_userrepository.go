@@ -3,6 +3,10 @@ package userrepository
 import (
 	"context"
 	"database/sql"
+	"errors"
+
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
@@ -33,6 +37,10 @@ func (p PgUserRepository) AddUser(ctx context.Context, userEntity entity.UserEnt
 
 	_, err = tx.ExecContext(ctx, query, userEntity.UID, userEntity.Login, userEntity.Password)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return ErrUserExists
+		}
 		return err
 	}
 	if err = tx.Commit(); err != nil {

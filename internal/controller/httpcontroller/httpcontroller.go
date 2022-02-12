@@ -46,6 +46,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 			http.Error(w, "login already in use", http.StatusConflict)
 			return
 		}
+		log.Err(err).Msg("user register error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

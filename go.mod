@@ -10,6 +10,8 @@ require (
 	github.com/go-chi/chi v1.5.4
 	github.com/go-chi/chi/v5 v5.0.0
 	github.com/golang-migrate/migrate/v4 v4.15.1
+	github.com/jackc/pgconn v1.11.0
+	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgx/v4 v4.15.0
 	github.com/onsi/gomega v1.18.1
 	github.com/pressly/goose/v3 v3.5.3
@@ -36,7 +38,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0 // indirect
 	github.com/imkira/go-interpol v1.0.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
-	github.com/jackc/pgconn v1.11.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgproto3/v2 v2.2.0 // indirect

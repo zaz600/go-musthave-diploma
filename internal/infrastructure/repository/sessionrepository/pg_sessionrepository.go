@@ -19,7 +19,7 @@ func (p PgSessionRepository) AddSession(ctx context.Context, session *entity.Ses
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	_, err = tx.ExecContext(ctx, query, session.SessionID, session.UID)
+	_, err = tx.ExecContext(ctx, query, session.SessionID, session.UID, session.CreatedAt)
 	if err != nil {
 		return err
 	}
