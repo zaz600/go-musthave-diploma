@@ -13,8 +13,17 @@ type PgSessionRepository struct {
 
 func (p PgSessionRepository) AddSession(ctx context.Context, session *entity.Session) error {
 	query := "insert into gophermart.sessions(sid, uid, created_at) values($1, $2, $3)"
-	_, err := p.db.ExecContext(ctx, query, session.SessionID, session.UID)
+	tx, err := p.db.Begin()
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	_, err = tx.ExecContext(ctx, query, session.SessionID, session.UID)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
 		return err
 	}
 	return nil

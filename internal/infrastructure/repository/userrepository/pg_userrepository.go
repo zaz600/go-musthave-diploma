@@ -25,8 +25,17 @@ func (p PgUserRepository) GetUser(ctx context.Context, login string) (entity.Use
 
 func (p PgUserRepository) AddUser(ctx context.Context, userEntity entity.UserEntity) error {
 	query := "insert into gophermart.users(uid, login, password) values($1, $2, $3)"
-	_, err := p.db.ExecContext(ctx, query, userEntity.UID, userEntity.Login, userEntity.Password)
+	tx, err := p.db.Begin()
 	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	_, err = tx.ExecContext(ctx, query, userEntity.UID, userEntity.Login, userEntity.Password)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
 		return err
 	}
 	return nil
