@@ -80,7 +80,7 @@ func newRouter(t *testing.T) *chi.Mux {
 	accrualClient, err := Accrual.NewClientWithResponses(accrualMockServer.URL)
 	require.NoError(t, err)
 	service := gophermartservice.New(accrualClient,
-		gophermartservice.WithStorage(gophermartservice.Memory),
+		gophermartservice.WithMemoryStorage(),
 		gophermartservice.WithAccrualRetryInterval(20*time.Millisecond),
 	)
 	return httpcontroller.NewRouter(service)

@@ -1,9 +1,9 @@
 package gophermartservice
 
 import (
+	"database/sql"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
@@ -16,24 +16,23 @@ import (
 
 type StorageType int
 
-const (
-	Memory = iota
-	PG
-)
-
 type Option func(*GophermartService)
 
-func WithStorage(storageType StorageType) Option {
+func WithMemoryStorage() Option {
 	return func(s *GophermartService) {
-		switch storageType {
-		case Memory:
-			s.userService = userservice.NewService(userrepository.NewInmemoryUserRepository())
-			s.sessionService = sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
-			s.OrderService = orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
-			s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository())
-		default:
-			log.Panic().Msg("unsupported storage type")
-		}
+		s.userService = userservice.NewService(userrepository.NewInmemoryUserRepository())
+		s.sessionService = sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
+		s.OrderService = orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
+		s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository())
+	}
+}
+
+func WithPgStorage(db *sql.DB) Option {
+	return func(s *GophermartService) {
+		s.userService = userservice.NewService(userrepository.NewPgUserRepository(db))
+		s.sessionService = sessionservice.NewService(sessionrepository.NewInmemorySessionRepository())
+		s.OrderService = orderservice.NewService(orderrepository.NewInmemoryOrderRepository())
+		s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository())
 	}
 }
 

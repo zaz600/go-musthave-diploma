@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +15,7 @@ import (
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/app/config"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/migration"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/httpserver"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/logger"
@@ -31,17 +34,39 @@ func Run(args []string) error {
 		Str("accrual", cfg.AccrualAddress).
 		Msg("config")
 
-	// TODO выбрать нужный тип репозитория
 	accrualClient, err := Accrual.NewClientWithResponses(cfg.AccrualAddress)
 	if err != nil {
 		return err
 	}
-	service := gophermartservice.New(accrualClient, gophermartservice.WithStorage(gophermartservice.Memory))
+
+	var db *sql.DB
+	var service *gophermartservice.GophermartService
+	switch cfg.GetRepositoryType() {
+	case config.MemoryRepo:
+		service = gophermartservice.New(accrualClient, gophermartservice.WithMemoryStorage())
+	case config.DatabaseRepo:
+		db, err = sql.Open("pgx", cfg.DatabaseDSN)
+		if err != nil {
+			return err
+		}
+
+		err = migration.Migrate(db)
+		if err != nil {
+			return err
+		}
+		service = gophermartservice.New(accrualClient, gophermartservice.WithPgStorage(db))
+	default:
+		return fmt.Errorf("unknown repo type")
+	}
+
 	server := httpserver.New(httpcontroller.NewRouter(service), httpserver.WithAddr(cfg.ServerAddress))
 
 	go func() {
 		<-ctx.Done()
 		log.Info().Msg("Shutdown...")
+		if db != nil {
+			_ = db.Close()
+		}
 		ctx, cancel := context.WithTimeout(ctxBg, 5*time.Second)
 		defer cancel()
 
