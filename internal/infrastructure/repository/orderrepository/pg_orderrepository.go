@@ -80,6 +80,7 @@ func (p PgOrderRepository) GetUserOrders(ctx context.Context, userID string) ([]
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	var orders []entity.Order
 	for rows.Next() {
 		var order entity.Order
@@ -87,6 +88,9 @@ func (p PgOrderRepository) GetUserOrders(ctx context.Context, userID string) ([]
 			return orders, err
 		}
 		orders = append(orders, order)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
 	}
 	return orders, nil
 }

@@ -51,6 +51,7 @@ func (r *InmemoryOrderRepository) SetOrderNextRetryAt(_ context.Context, orderID
 
 	if order, ok := r.db[orderID]; ok {
 		order.RetryCount++
+		r.db[orderID] = order
 		return nil
 	}
 	return ErrOrderNotFound
