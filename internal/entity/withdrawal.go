@@ -9,8 +9,8 @@ import (
 type Withdrawal struct {
 	ID          string
 	UID         string
-	OrderID     string `json:"order"`
-	ProcessedAt int64  `json:"processed_at"`
+	OrderID     string    `json:"order"`
+	ProcessedAt time.Time `json:"processed_at"`
 	// TODO https://github.com/shopspring/decimal
 	Sum float32 `json:"sum"`
 }
@@ -20,7 +20,7 @@ func NewWithdrawal(userID string, orderID string, sum float32) *Withdrawal {
 		ID:          random.String(12),
 		UID:         userID,
 		OrderID:     orderID,
-		ProcessedAt: time.Now().UnixMilli(),
+		ProcessedAt: time.Now(),
 		Sum:         sum,
 	}
 }

@@ -32,7 +32,7 @@ func WithPgStorage(db *sql.DB) Option {
 		s.userService = userservice.NewService(userrepository.NewPgUserRepository(db))
 		s.sessionService = sessionservice.NewService(sessionrepository.NewPgSessionRepository(db))
 		s.OrderService = orderservice.NewService(orderrepository.NewPgOrderRepository(db))
-		s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewInmemoryWithdrawalRepository())
+		s.WithdrawalService = withdrawalservice.NewService(withdrawalrepository.NewPgUserRepository(db))
 	}
 }
 

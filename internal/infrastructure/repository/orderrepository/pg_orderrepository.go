@@ -34,7 +34,6 @@ func (p PgOrderRepository) AddOrder(ctx context.Context, order entity.Order) err
 		return err
 	}
 	return nil
-
 }
 
 func (p PgOrderRepository) SetOrderStatusAndAccrual(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error {

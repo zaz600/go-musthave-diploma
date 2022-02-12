@@ -262,7 +262,7 @@ func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *
 	for _, withdrawal := range withdrawals {
 		respWithdrawal := Gophermart.UserBalanceWithdrawal{
 			Order:       withdrawal.OrderID,
-			ProcessedAt: time.UnixMilli(withdrawal.ProcessedAt).Format(time.RFC3339),
+			ProcessedAt: withdrawal.ProcessedAt.Format(time.RFC3339),
 			Sum:         Gophermart.Amount(withdrawal.Sum),
 		}
 		resp = append(resp, respWithdrawal)

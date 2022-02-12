@@ -1,14 +1,18 @@
 package httpcontroller_test
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ShiraazMoollatjie/goluhn"
 	"github.com/gavv/httpexpect/v2"
 	"github.com/go-chi/chi"
 	. "github.com/onsi/gomega"
@@ -31,13 +35,11 @@ func NewUser() RegisterRequest {
 	}
 }
 
-func newRouter(t *testing.T) *chi.Mux {
-	t.Helper()
-
+func newAccrualMock() *httptest.Server {
 	mu := &sync.Mutex{}
 	orderStates := map[string]int{}
 
-	accrualMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/orders/") {
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -50,11 +52,11 @@ func newRouter(t *testing.T) *chi.Mux {
 
 		var accrual float32 = 50.0
 		status := Accrual.ResponseStatusPROCESSED
-		if orderID == "999999998" {
+		if strings.HasPrefix(orderID, "99999") {
 			status = Accrual.ResponseStatusINVALID
 		}
 
-		if orderID == "888888880" {
+		if strings.HasPrefix(orderID, "88888") {
 			switch orderStates[orderID] {
 			case 1:
 				status = Accrual.ResponseStatusREGISTERED
@@ -76,13 +78,28 @@ func newRouter(t *testing.T) *chi.Mux {
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
+}
 
-	accrualClient, err := Accrual.NewClientWithResponses(accrualMockServer.URL)
+func newRouter(t *testing.T) *chi.Mux {
+	t.Helper()
+
+	accrualClient, err := Accrual.NewClientWithResponses(newAccrualMock().URL)
 	require.NoError(t, err)
-	service := gophermartservice.New(accrualClient,
-		gophermartservice.WithMemoryStorage(),
-		gophermartservice.WithAccrualRetryInterval(20*time.Millisecond),
-	)
+
+	options := []gophermartservice.Option{gophermartservice.WithAccrualRetryInterval(20 * time.Millisecond)}
+
+	if os.Getenv("TEST_PG") != "" {
+		db, err := sql.Open("pgx", "postgres://postgres:postgres@localhost:5432/gophermart")
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = db.Close()
+		})
+		options = append(options, gophermartservice.WithPgStorage(db))
+	} else {
+		options = append(options, gophermartservice.WithMemoryStorage())
+	}
+
+	service := gophermartservice.New(accrualClient, options...)
 	return httpcontroller.NewRouter(service)
 }
 
@@ -195,11 +212,12 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
+		orderID := goluhn.Generate(15)
 		token := register(t, e, user)
 
 		e.POST("/api/user/orders").
 			WithHeader("Authorization", token).
-			WithText("92345678905").
+			WithText(orderID).
 			Expect().
 			Status(http.StatusAccepted)
 	})
@@ -210,12 +228,13 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
+		orderID := goluhn.Generate(15)
 		token := register(t, e, user)
-		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, orderID, token)
 
 		e.POST("/api/user/orders").
 			WithHeader("Authorization", token).
-			WithText("92345678905").
+			WithText(orderID).
 			Expect().
 			Status(http.StatusOK)
 	})
@@ -226,8 +245,9 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 		defer server.Close()
 		e := httpexpect.New(t, server.URL)
 
+		orderID := goluhn.Generate(15)
 		token := register(t, e, user)
-		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, orderID, token)
 
 		// второй юзер
 		user2 := NewUser()
@@ -236,7 +256,7 @@ func TestGophermartController_UploadOrder(t *testing.T) {
 
 		e2.POST("/api/user/orders").
 			WithHeader("Authorization", token2).
-			WithText("92345678905").
+			WithText(orderID).
 			Expect().
 			Status(http.StatusConflict)
 	})
@@ -301,9 +321,9 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 
 		token := register(t, e, user)
 
-		uploadOrder(t, e, "92345678905", token)
-		uploadOrder(t, e, "12345678903", token)
-		uploadOrder(t, e, "346436439", token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
 
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
@@ -354,7 +374,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 		e := httpexpect.New(t, server.URL)
 
 		token := register(t, e, user)
-		uploadOrder(t, e, "999999998", token) // invalid in mock
+		uploadOrder(t, e, goluhn.GenerateWithPrefix("99999", 15), token) // invalid in mock
 
 		g := NewGomegaWithT(t)
 		g.Eventually(func(g Gomega) {
@@ -381,7 +401,7 @@ func TestGophermartController_GetUserOrders(t *testing.T) {
 
 		token := register(t, e, user)
 		// Этот ордер в моке сервиса accrual проходит все статусы обработки, при запросе начислений
-		uploadOrder(t, e, "888888880", token) // REGISTERED -> PROCESSING -> PROCESSING -> PROCESSED in mock
+		uploadOrder(t, e, goluhn.GenerateWithPrefix("88888", 15), token) // REGISTERED -> PROCESSING -> PROCESSING -> PROCESSED in mock
 
 		// Ждем, что ордер дойдет до конца обработки и баллы будут начислены
 		g := NewGomegaWithT(t)
@@ -421,8 +441,8 @@ func TestGophermartController_GetUserBalance(t *testing.T) {
 		balance.Value("current").Equal(0.0)
 		balance.Value("withdrawn").Equal(0.0)
 
-		uploadOrder(t, e, "92345678905", token)
-		uploadOrder(t, e, "346436439", token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
 
 		assertBalance(t, e, 100.0, 0, token)
 	})
@@ -447,13 +467,13 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 		e := httpexpect.New(t, server.URL)
 
 		token := register(t, e, user)
-		uploadOrder(t, e, "92345678905", token)
-		uploadOrder(t, e, "346436439", token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
 		assertBalance(t, e, 100.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
 			WithHeader("Authorization", token).
-			WithText(`{"order": "92345678905", "sum": 10.50}`).
+			WithText(fmt.Sprintf(`{"order": "%s", "sum": 10.50}`, goluhn.Generate(15))).
 			Expect().
 			Status(http.StatusOK)
 
@@ -500,17 +520,17 @@ func TestGophermartController_UserBalanceWithdraw(t *testing.T) {
 
 		e.POST("/api/user/balance/withdraw").
 			WithHeader("Authorization", token).
-			WithText(`{"order": "92345678905", "sum": 751.21}`).
+			WithText(fmt.Sprintf(`{"order": "%s", "sum": 751.21}`, goluhn.Generate(15))).
 			Expect().
 			Status(http.StatusPaymentRequired)
 
-		uploadOrder(t, e, "92345678905", token)
-		uploadOrder(t, e, "346436439", token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
 		assertBalance(t, e, 100.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
 			WithHeader("Authorization", token).
-			WithText(`{"order": "92345678905", "sum": 751.21}`).
+			WithText(fmt.Sprintf(`{"order": "%s", "sum": 751.21}`, goluhn.Generate(15))).
 			Expect().
 			Status(http.StatusPaymentRequired)
 		assertBalance(t, e, 100.0, 0, token)
@@ -526,12 +546,12 @@ func TestGophermartController_UserBalanceWithdrawals(t *testing.T) {
 
 		token := register(t, e, user)
 
-		uploadOrder(t, e, "92345678905", token)
+		uploadOrder(t, e, goluhn.Generate(15), token)
 		assertBalance(t, e, 50.0, 0, token)
 
 		e.POST("/api/user/balance/withdraw").
 			WithHeader("Authorization", token).
-			WithText(`{"order": "92345678905", "sum": 10.50}`).
+			WithText(fmt.Sprintf(`{"order": "%s", "sum": 10.50}`, goluhn.Generate(15))).
 			Expect().
 			Status(http.StatusOK)
 
@@ -588,7 +608,7 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	// Загружаем заказ
 	e.POST("/api/user/orders").
 		WithHeader("Authorization", token).
-		WithText("92345678905").
+		WithText(goluhn.Generate(15)).
 		Expect().
 		Status(http.StatusAccepted)
 
@@ -614,7 +634,7 @@ func TestGophermart_SuccessPath(t *testing.T) {
 	// Запрашиваем списание
 	e.POST("/api/user/balance/withdraw").
 		WithHeader("Authorization", token).
-		WithText(`{"order": "92345678905", "sum": 10.50}`).
+		WithText(fmt.Sprintf(`{"order": "%s", "sum": 10.50}`, goluhn.Generate(15))).
 		Expect().
 		Status(http.StatusOK)
 
