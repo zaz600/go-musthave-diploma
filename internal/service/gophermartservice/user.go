@@ -11,6 +11,8 @@ import (
 )
 
 func (s GophermartService) RegisterUser(ctx context.Context, login string, password string) (*entity.Session, error) {
+	// TODO создавать сессию и открывать счет надо в одной транзакции с регистрацией
+
 	hashedPassword, err := hasher.HashPassword(password)
 	if err != nil {
 		return nil, err
@@ -21,6 +23,12 @@ func (s GophermartService) RegisterUser(ctx context.Context, login string, passw
 		if errors.Is(err, userrepository.ErrUserExists) {
 			return nil, ErrUserExists
 		}
+		return nil, err
+	}
+
+	account := entity.NewAccount(user.UID)
+	err = s.repo.AccountRepo.AddAccount(ctx, *account)
+	if err != nil {
 		return nil, err
 	}
 

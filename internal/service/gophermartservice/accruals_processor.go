@@ -31,6 +31,11 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		return
 	}
 
+	if order.Status == entity.OrderStatusPROCESSED || order.Status == entity.OrderStatusINVALID {
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("GetAccruals finnish order status")
+		return
+	}
+
 	var resp *accrualclient.GetAccrualResponse
 	resultCh := s.accrualClient.GetAccrual(ctx, orderID)
 	select {
@@ -52,6 +57,11 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
 		err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, resp.Status, resp.Accrual)
 		logError(err)
+		if resp.Accrual > 0 {
+			// TODO баланс изменять надо в одной транзакции с регистрацией зачисления
+			err = s.repo.AccountRepo.RefillAmount(ctx, order.UID, resp.Accrual)
+			logError(err)
+		}
 		return
 	default:
 		if resp.Err == nil {

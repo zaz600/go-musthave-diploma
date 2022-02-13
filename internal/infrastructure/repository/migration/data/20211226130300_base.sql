@@ -48,3 +48,15 @@ CREATE TABLE IF NOT EXISTS withdrawals
 );
 ALTER TABLE withdrawals ALTER COLUMN processed_at SET DEFAULT now();
 CREATE UNIQUE INDEX withdrawals_order_id_uniq_idx ON withdrawals USING btree (order_id);
+
+CREATE TABLE IF NOT EXISTS accounts
+(
+    id             serial primary key,
+    uid            varchar,
+    account_id     varchar,
+    balance        decimal (15,2),
+    withdrawals    decimal (15,2),
+    created_at     TIMESTAMP
+);
+ALTER TABLE accounts ALTER COLUMN created_at SET DEFAULT now();
+CREATE UNIQUE INDEX accounts_account_id_uniq_idx ON accounts USING btree (account_id);

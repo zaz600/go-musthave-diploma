@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/accountrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
@@ -22,6 +23,7 @@ func WithMemoryStorage() Option {
 			SessionRepo:    sessionrepository.NewInmemorySessionRepository(),
 			OrderRepo:      orderrepository.NewInmemoryOrderRepository(),
 			WithdrawalRepo: withdrawalrepository.NewInmemoryWithdrawalRepository(),
+			AccountRepo:    accountrepository.NewInmemoryAccountRepository(),
 		}
 		s.repo = repo
 	}
@@ -34,6 +36,7 @@ func WithPgStorage(db *sql.DB) Option {
 			SessionRepo:    sessionrepository.NewPgSessionRepository(db),
 			OrderRepo:      orderrepository.NewPgOrderRepository(db),
 			WithdrawalRepo: withdrawalrepository.NewPgUserRepository(db),
+			AccountRepo:    accountrepository.NewPgAccountRepository(db),
 		}
 		s.repo = repo
 	}
