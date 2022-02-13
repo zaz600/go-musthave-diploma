@@ -2,12 +2,12 @@ package accrualclient
 
 import (
 	"errors"
-	"fmt"
 )
 
 var ErrWrongStatusCode = errors.New("wrong http status code")
 var ErrUnknownAccrualStatus = errors.New("unknown accrual status")
 var ErrFatalError = errors.New("fatal error")
+var ErrTooManyRedirects = errors.New("too many requests")
 
 type TooManyRequestsError struct {
 	err           error
@@ -25,6 +25,6 @@ func (e TooManyRequestsError) Unwrap() error {
 func NewTooManyRequestsError(retryAfterSec int) *TooManyRequestsError {
 	return &TooManyRequestsError{
 		RetryAfterSec: retryAfterSec,
-		err:           fmt.Errorf("too many requests"),
+		err:           ErrTooManyRedirects,
 	}
 }
