@@ -1,0 +1,15 @@
+package repository
+
+import (
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/sessionrepository"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/withdrawalrepository"
+)
+
+type RepoRegistry struct {
+	UserRepo       userrepository.UserRepository
+	SessionRepo    sessionrepository.SessionRepository
+	OrderRepo      orderrepository.OrderRepository
+	WithdrawalRepo withdrawalrepository.WithdrawalRepository
+}

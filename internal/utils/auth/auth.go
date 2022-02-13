@@ -2,9 +2,12 @@ package auth
 
 import (
 	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/zaz600/go-musthave-diploma/internal/entity"
 )
 
 const key = "secureSecretText" // TODO взять из волта
@@ -15,7 +18,7 @@ type UserClaims struct {
 	jwt.StandardClaims
 }
 
-func CreateToken(userID string, sessionID string) (string, error) {
+func createToken(userID string, sessionID string) (string, error) {
 	claims := UserClaims{
 		UserID:    userID,
 		SessionID: sessionID,
@@ -32,7 +35,7 @@ func CreateToken(userID string, sessionID string) (string, error) {
 	return signedToken, nil
 }
 
-func GetUserClaims(jwtToken string) (*UserClaims, error) {
+func getClaims(jwtToken string) (*UserClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		jwtToken,
 		&UserClaims{},
@@ -49,6 +52,27 @@ func GetUserClaims(jwtToken string) (*UserClaims, error) {
 	}
 	if claims.ExpiresAt < time.Now().UTC().Unix() {
 		return nil, errors.New("jwt is expired")
+	}
+	return claims, nil
+}
+
+func SetJWT(w http.ResponseWriter, session *entity.Session) error {
+	jwtToken, err := createToken(session.UID, session.SessionID)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Authorization", "Bearer "+jwtToken)
+	return nil
+}
+
+func GetClaims(r *http.Request) (*UserClaims, error) {
+	jwtToken := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
+	if jwtToken == "" {
+		return nil, ErrTokenNotFound
+	}
+	claims, err := getClaims(jwtToken)
+	if err != nil {
+		return nil, err
 	}
 	return claims, nil
 }

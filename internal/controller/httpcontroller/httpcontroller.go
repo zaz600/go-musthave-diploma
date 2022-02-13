@@ -14,8 +14,7 @@ import (
 	Gophermart "github.com/zaz600/go-musthave-diploma/api"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/orderservice"
-	"github.com/zaz600/go-musthave-diploma/internal/service/userservice"
+	"github.com/zaz600/go-musthave-diploma/internal/utils/auth"
 	"github.com/zaz600/go-musthave-diploma/internal/utils/luhn"
 )
 
@@ -42,7 +41,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 
 	session, err := c.gophermartService.RegisterUser(context.TODO(), request.Login, request.Password)
 	if err != nil {
-		if errors.Is(err, userservice.ErrUserExists) {
+		if errors.Is(err, gophermartservice.ErrUserExists) {
 			http.Error(w, "login already in use", http.StatusConflict)
 			return
 		}
@@ -50,7 +49,7 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	err = c.gophermartService.SetJWT(w, session)
+	err = auth.SetJWT(w, session)
 	if err != nil {
 		log.Err(err).Msg("user register error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -73,7 +72,7 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 
 	session, err := c.gophermartService.LoginUser(context.TODO(), request.Login, request.Password)
 	if err != nil {
-		if errors.Is(err, userservice.ErrAuth) {
+		if errors.Is(err, gophermartservice.ErrAuth) {
 			http.Error(w, "invalid login/password", http.StatusUnauthorized)
 			return
 		}
@@ -82,7 +81,7 @@ func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = c.gophermartService.SetJWT(w, session)
+	err = auth.SetJWT(w, session)
 	if err != nil {
 		log.Err(err).Msg("user login error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -109,17 +108,17 @@ func (c GophermartController) UploadOrder(w http.ResponseWriter, r *http.Request
 	orderID := string(bytes)
 
 	log.Info().Str("uid", userID).Str("orderID", orderID).Msg("UploadOrder")
-	err = c.gophermartService.OrderService.UploadOrder(context.TODO(), userID, orderID)
+	err = c.gophermartService.UploadOrder(context.TODO(), userID, orderID)
 	if err != nil {
-		if errors.Is(err, orderservice.ErrOrderExists) {
+		if errors.Is(err, gophermartservice.ErrOrderExists) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if errors.Is(err, orderservice.ErrOrderOwnedByAnotherUser) {
+		if errors.Is(err, gophermartservice.ErrOrderOwnedByAnotherUser) {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
-		if errors.Is(err, orderservice.ErrInvalidOrderFormat) {
+		if errors.Is(err, gophermartservice.ErrInvalidOrderFormat) {
 			http.Error(w, "invalid orderID format, check luhn mismatch", http.StatusUnprocessableEntity)
 			return
 		}
@@ -141,7 +140,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	orders, err := c.gophermartService.OrderService.GetUserOrders(context.TODO(), userID)
+	orders, err := c.gophermartService.GetUserOrders(context.TODO(), userID)
 	if err != nil {
 		log.Err(err).Msg("get user orders error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -229,7 +228,7 @@ func (c *GophermartController) UserBalanceWithdraw(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = c.gophermartService.WithdrawalService.UploadWithdrawal(context.TODO(), userID, request.Order, float32(request.Sum))
+	err = c.gophermartService.UploadWithdrawal(context.TODO(), userID, request.Order, float32(request.Sum))
 	if err != nil {
 		log.Err(err).Msg("user balance withdraw error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -247,7 +246,7 @@ func (c *GophermartController) UserBalanceWithdrawals(w http.ResponseWriter, r *
 		return
 	}
 
-	withdrawals, err := c.gophermartService.WithdrawalService.GetUserWithdrawals(context.TODO(), userID)
+	withdrawals, err := c.gophermartService.GetUserWithdrawals(context.TODO(), userID)
 	if err != nil {
 		log.Err(err).Msg("user balance withdrawals error")
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -304,12 +303,12 @@ func NewRouter(gophermartService *gophermartservice.GophermartService) *chi.Mux 
 
 func (c GophermartController) AuthCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, err := c.gophermartService.GetUserID(r)
+		claims, err := auth.GetClaims(r)
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ctx := context.WithValue(r.Context(), userIDKey, userID)
+		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
