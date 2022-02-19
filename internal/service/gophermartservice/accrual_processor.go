@@ -37,7 +37,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 
 	var resp *accrual.GetAccrualResponse
-	resultCh := s.accrualClient.GetAccrual(ctx, orderID)
+	resultCh := s.accrualProvider.GetAccrual(ctx, orderID)
 	select {
 	case <-ctx.Done():
 		return

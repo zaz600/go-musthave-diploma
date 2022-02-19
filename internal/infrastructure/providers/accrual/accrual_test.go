@@ -27,8 +27,8 @@ func (m *mockAccrualClient) GetOrderAccrualWithResponse(ctx context.Context, num
 func TestClient_GetAccrual(t *testing.T) {
 	accrualAPIClient := new(mockAccrualClient)
 	accrualAPIClient.On("GetOrderAccrualWithResponse", context.TODO(), Accrual.Order("1")).Return(nil, fmt.Errorf("foo"))
-	accrualClient := New(accrualAPIClient)
-	result := accrualClient.getAccrual(context.TODO(), "1")
+	accrualProvider := NewProvider(accrualAPIClient)
+	result := accrualProvider.getAccrual(context.TODO(), "1")
 	assert.Error(t, result.Err)
 	assert.Equal(t, float32(0), result.Accrual)
 	assert.Equal(t, entity.OrderStatus(""), result.Status)
@@ -53,8 +53,8 @@ func TestClient_GetAccrual2(t *testing.T) {
 
 	accrualAPIClient.On("GetOrderAccrualWithResponse", context.TODO(), Accrual.Order("1")).Return(resp, nil)
 
-	accrualClient := New(accrualAPIClient)
-	result := accrualClient.getAccrual(context.TODO(), "1")
+	accrualProvider := NewProvider(accrualAPIClient)
+	result := accrualProvider.getAccrual(context.TODO(), "1")
 	assert.NoError(t, result.Err)
 	assert.Equal(t, float32(555), result.Accrual)
 	assert.Equal(t, entity.OrderStatusProcessed, result.Status)
@@ -77,8 +77,8 @@ func TestClient_GetAccrual3(t *testing.T) {
 
 	accrualAPIClient.On("GetOrderAccrualWithResponse", context.TODO(), Accrual.Order("1")).Return(resp, nil)
 
-	accrualClient := New(accrualAPIClient)
-	result := accrualClient.getAccrual(context.TODO(), "1")
+	accrualProvider := NewProvider(accrualAPIClient)
+	result := accrualProvider.getAccrual(context.TODO(), "1")
 	var actualError *TooManyRequestsError
 	assert.ErrorAs(t, result.Err, &actualError)
 	assert.Equal(t, 60, actualError.RetryAfterSec)

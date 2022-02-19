@@ -12,6 +12,10 @@ import (
 	"go.uber.org/ratelimit"
 )
 
+type Provider interface {
+	GetAccrual(ctx context.Context, orderID string) chan *GetAccrualResponse
+}
+
 type GetAccrualResponse struct {
 	Status  entity.OrderStatus
 	Accrual float32
@@ -72,7 +76,7 @@ func (c Client) getAccrual(ctx context.Context, orderID string) *GetAccrualRespo
 	return &GetAccrualResponse{Err: ErrUnknownAccrualStatus}
 }
 
-func New(accrualAPIClient Accrual.ClientWithResponsesInterface) *Client {
+func NewProvider(accrualAPIClient Accrual.ClientWithResponsesInterface) *Client {
 	rl := ratelimit.New(1000, ratelimit.Per(1*time.Minute)) // per second
 	return &Client{accrualAPIClient: accrualAPIClient, rateLimiter: rl}
 }

@@ -13,13 +13,13 @@ const accrualDefaultRetryInterval = 50 * time.Millisecond
 type GophermartService struct {
 	repo repository.RepoRegistry
 
-	accrualClient        *accrual.Client
+	accrualProvider      accrual.Provider
 	accrualRetryInterval time.Duration
 }
 
 func New(accrualAPIClient Accrual.ClientWithResponsesInterface, opts ...Option) *GophermartService {
 	s := &GophermartService{
-		accrualClient:        accrual.New(accrualAPIClient),
+		accrualProvider:      accrual.NewProvider(accrualAPIClient),
 		accrualRetryInterval: accrualDefaultRetryInterval,
 	}
 	for _, opt := range opts {
