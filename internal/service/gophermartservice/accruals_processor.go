@@ -31,7 +31,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		return
 	}
 
-	if order.Status == entity.OrderStatusPROCESSED || order.Status == entity.OrderStatusINVALID {
+	if order.Status == entity.OrderStatusProcessed || order.Status == entity.OrderStatusInvalid {
 		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("GetAccruals finnish order status")
 		return
 	}
@@ -53,7 +53,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	}
 
 	switch resp.Status {
-	case entity.OrderStatusPROCESSED, entity.OrderStatusINVALID:
+	case entity.OrderStatusProcessed, entity.OrderStatusInvalid:
 		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
 		err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, resp.Status, resp.Accrual)
 		logError(err)

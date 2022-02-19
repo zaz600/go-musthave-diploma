@@ -16,7 +16,7 @@ type mockAccrualClient struct {
 	mock.Mock
 }
 
-func (m *mockAccrualClient) GetOrderAccrualWithResponse(ctx context.Context, number Accrual.Order, reqEditors ...Accrual.RequestEditorFn) (*Accrual.GetOrderAccrualResponse, error) {
+func (m *mockAccrualClient) GetOrderAccrualWithResponse(ctx context.Context, number Accrual.Order, _ ...Accrual.RequestEditorFn) (*Accrual.GetOrderAccrualResponse, error) {
 	args := m.Called(ctx, number)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -57,7 +57,7 @@ func TestClient_GetAccrual2(t *testing.T) {
 	result := accrualClient.getAccrual(context.TODO(), "1")
 	assert.NoError(t, result.Err)
 	assert.Equal(t, float32(555), result.Accrual)
-	assert.Equal(t, entity.OrderStatusPROCESSED, result.Status)
+	assert.Equal(t, entity.OrderStatusProcessed, result.Status)
 	accrualAPIClient.AssertExpectations(t)
 }
 

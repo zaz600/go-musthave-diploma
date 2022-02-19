@@ -45,7 +45,7 @@ func (r *InmemoryOrderRepository) SetOrderStatusAndAccrual(_ context.Context, or
 	return ErrOrderNotFound
 }
 
-func (r *InmemoryOrderRepository) SetOrderNextRetryAt(_ context.Context, orderID string, nextRetryAt time.Time) error {
+func (r *InmemoryOrderRepository) SetOrderNextRetryAt(_ context.Context, orderID string, _ time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -80,7 +80,7 @@ func (r *InmemoryOrderRepository) GetUserAccrual(ctx context.Context, userID str
 	}
 	var sum float32
 	for _, order := range orders {
-		if order.Status == entity.OrderStatusPROCESSED {
+		if order.Status == entity.OrderStatusProcessed {
 			sum += order.Accrual
 		}
 	}

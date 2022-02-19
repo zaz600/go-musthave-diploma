@@ -158,7 +158,7 @@ func (c *GophermartController) GetUserOrders(w http.ResponseWriter, r *http.Requ
 			Status:     Gophermart.OrderStatus(order.Status),
 			UploadedAt: order.UploadedAt.Format(time.RFC3339),
 		}
-		if order.Status == entity.OrderStatusPROCESSED {
+		if order.Status == entity.OrderStatusProcessed {
 			respOrder.Accrual = &order.Accrual
 		}
 		resp = append(resp, respOrder)

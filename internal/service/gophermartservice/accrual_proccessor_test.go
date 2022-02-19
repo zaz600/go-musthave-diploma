@@ -16,7 +16,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("no error", func(t *testing.T) {
 		resp := &accrualclient.GetAccrualResponse{
-			Status: entity.OrderStatusNEW,
+			Status: entity.OrderStatusNew,
 			Err:    nil,
 		}
 		next := s.calcNext(resp)
@@ -25,7 +25,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("too many requests error", func(t *testing.T) {
 		resp := &accrualclient.GetAccrualResponse{
-			Status: entity.OrderStatusNEW,
+			Status: entity.OrderStatusNew,
 			Err:    accrualclient.TooManyRequestsError{RetryAfterSec: 60},
 		}
 		next := s.calcNext(resp)
@@ -34,7 +34,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("other error", func(t *testing.T) {
 		resp := &accrualclient.GetAccrualResponse{
-			Status: entity.OrderStatusNEW,
+			Status: entity.OrderStatusNew,
 			Err:    fmt.Errorf("boo"),
 		}
 		next := s.calcNext(resp)

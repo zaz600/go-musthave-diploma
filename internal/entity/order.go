@@ -9,11 +9,10 @@ import (
 type OrderStatus string
 
 const (
-	OrderStatusNEW            OrderStatus = "NEW"
-	OrderStatusPROCESSING     OrderStatus = "PROCESSING"
-	OrderStatusINVALID        OrderStatus = "INVALID"
-	OrderStatusPROCESSED      OrderStatus = "PROCESSED"
-	OrderStatusTECHNICALERROR OrderStatus = "TECHNICAL_ERROR"
+	OrderStatusNew            OrderStatus = "NEW"
+	OrderStatusProcessing     OrderStatus = "PROCESSING"
+	OrderStatusInvalid        OrderStatus = "INVALID"
+	OrderStatusProcessed      OrderStatus = "PROCESSED"
 	OrderStatusTooManyRetries OrderStatus = "TOO_MANY_RETRIES"
 )
 
@@ -35,7 +34,7 @@ func NewOrder(userID string, orderID string) *Order {
 		UID:        userID,
 		OrderID:    orderID,
 		UploadedAt: time.Now(),
-		Status:     OrderStatusNEW,
+		Status:     OrderStatusNew,
 		Accrual:    0,
 		RetryCount: 0,
 	}

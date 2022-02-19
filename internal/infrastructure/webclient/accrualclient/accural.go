@@ -61,13 +61,13 @@ func (c Client) getAccrual(ctx context.Context, orderID string) *GetAccrualRespo
 
 	switch resp.JSON200.Status {
 	case Accrual.ResponseStatusINVALID:
-		return &GetAccrualResponse{Accrual: 0.0, Status: entity.OrderStatusINVALID}
+		return &GetAccrualResponse{Accrual: 0.0, Status: entity.OrderStatusInvalid}
 	case Accrual.ResponseStatusPROCESSED:
-		return &GetAccrualResponse{Accrual: *resp.JSON200.Accrual, Status: entity.OrderStatusPROCESSED}
+		return &GetAccrualResponse{Accrual: *resp.JSON200.Accrual, Status: entity.OrderStatusProcessed}
 	case Accrual.ResponseStatusREGISTERED:
-		return &GetAccrualResponse{Status: entity.OrderStatusPROCESSING}
+		return &GetAccrualResponse{Status: entity.OrderStatusProcessing}
 	case Accrual.ResponseStatusPROCESSING:
-		return &GetAccrualResponse{Status: entity.OrderStatusPROCESSING}
+		return &GetAccrualResponse{Status: entity.OrderStatusProcessing}
 	}
 	return &GetAccrualResponse{Err: ErrUnknownAccrualStatus}
 }
