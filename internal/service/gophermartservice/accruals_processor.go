@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/webclient/accrualclient"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrualclient"
 )
 
 //nolint:funlen

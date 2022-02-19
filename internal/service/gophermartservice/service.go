@@ -4,8 +4,8 @@ import (
 	"time"
 
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrualclient"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/webclient/accrualclient"
 )
 
 const accrualDefaultRetryInterval = 50 * time.Millisecond
