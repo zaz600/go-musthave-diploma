@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrualclient"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrual"
 )
 
 //nolint:funlen
@@ -36,7 +36,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		return
 	}
 
-	var resp *accrualclient.GetAccrualResponse
+	var resp *accrual.GetAccrualResponse
 	resultCh := s.accrualClient.GetAccrual(ctx, orderID)
 	select {
 	case <-ctx.Done():
@@ -47,7 +47,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 	next := s.calcNext(resp)
 	if err := resp.Err; err != nil {
 		log.Err(err).Str("orderID", orderID).Msg("error during GetAccrual")
-		if errors.Is(err, accrualclient.ErrFatalError) {
+		if errors.Is(err, accrual.ErrFatalError) {
 			return
 		}
 	}
@@ -84,10 +84,10 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 }
 
 // calcNext вычисляет через сколько надо повторить запрос
-func (s GophermartService) calcNext(resp *accrualclient.GetAccrualResponse) time.Duration {
+func (s GophermartService) calcNext(resp *accrual.GetAccrualResponse) time.Duration {
 	next := s.accrualRetryInterval
 	if err := resp.Err; err != nil {
-		var errTooManyRequests accrualclient.TooManyRequestsError
+		var errTooManyRequests accrual.TooManyRequestsError
 		if errors.As(err, &errTooManyRequests) {
 			next = time.Duration(errTooManyRequests.RetryAfterSec) * time.Second
 		}
