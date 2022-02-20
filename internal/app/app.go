@@ -16,9 +16,9 @@ import (
 	"github.com/zaz600/go-musthave-diploma/internal/app/config"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/migration"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/httpserver"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/logger"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/httpserver"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/logger"
 )
 
 func Run(args []string) error {

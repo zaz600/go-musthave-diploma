@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/random"
 )
 
 type Withdrawal struct {

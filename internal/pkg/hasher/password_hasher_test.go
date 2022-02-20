@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/random"
 )
 
 func TestHashPassword(t *testing.T) {

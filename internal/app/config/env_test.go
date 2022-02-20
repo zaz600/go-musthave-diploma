@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/random"
 )
 
 func TestGetEnvOrDefault_Env_Exists(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/orderrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/luhn"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/luhn"
 )
 
 func (s GophermartService) UploadOrder(ctx context.Context, userID string, orderID string) error {

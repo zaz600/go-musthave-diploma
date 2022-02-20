@@ -1,7 +1,7 @@
 package entity
 
 import (
-	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/random"
 )
 
 type UserEntity struct {

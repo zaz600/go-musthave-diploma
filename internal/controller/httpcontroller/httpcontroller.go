@@ -13,9 +13,9 @@ import (
 	"github.com/rs/zerolog/log"
 	Gophermart "github.com/zaz600/go-musthave-diploma/api"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/auth"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/luhn"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/auth"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/luhn"
 )
 
 type key int
@@ -30,7 +30,6 @@ type GophermartController struct {
 	gophermartService *gophermartservice.GophermartService
 }
 
-//lint:ignore ST1003 ignore this!
 func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.RegisterRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -61,7 +60,6 @@ func (c GophermartController) UserRegister(w http.ResponseWriter, r *http.Reques
 	_, _ = w.Write([]byte(`{"status": "success"}`))
 }
 
-//lint:ignore ST1003 ignore this!
 func (c GophermartController) UserLogin(w http.ResponseWriter, r *http.Request) { //nolint:revive
 	var request Gophermart.LoginRequest
 	err := json.NewDecoder(r.Body).Decode(&request)

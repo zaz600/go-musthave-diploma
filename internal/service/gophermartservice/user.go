@@ -7,7 +7,7 @@ import (
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/repository/userrepository"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/hasher"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/hasher"
 )
 
 func (s GophermartService) RegisterUser(ctx context.Context, login string, password string) (*entity.Session, error) {

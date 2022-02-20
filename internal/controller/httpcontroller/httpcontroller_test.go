@@ -20,8 +20,8 @@ import (
 	. "github.com/zaz600/go-musthave-diploma/api"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/controller/httpcontroller"
+	"github.com/zaz600/go-musthave-diploma/internal/pkg/random"
 	"github.com/zaz600/go-musthave-diploma/internal/service/gophermartservice"
-	"github.com/zaz600/go-musthave-diploma/internal/utils/random"
 )
 
 const (
