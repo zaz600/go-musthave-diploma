@@ -389,13 +389,13 @@ func (suite *HTTPControllerTestSuite) TestUserBalanceWithdraw_PaymentRequired() 
 		Expect().
 		Status(http.StatusPaymentRequired)
 
-	uploadOrder(t, e, goluhn.Generate(15), token)
-	uploadOrder(t, e, goluhn.Generate(15), token)
+	uploadOrder(t, e, random.OrderID(), token)
+	uploadOrder(t, e, random.OrderID(), token)
 	assertBalance(t, e, 100.0, 0, token)
 
 	e.POST("/api/user/balance/withdraw").
 		WithHeader("Authorization", token).
-		WithText(fmt.Sprintf(`{"order": "%s", "sum": 751.21}`, goluhn.Generate(15))).
+		WithText(fmt.Sprintf(`{"order": "%s", "sum": 751.21}`, random.OrderID())).
 		Expect().
 		Status(http.StatusPaymentRequired)
 	assertBalance(t, e, 100.0, 0, token)
@@ -407,7 +407,7 @@ func (suite *HTTPControllerTestSuite) TestUserBalanceWithdrawals_Success() {
 
 	token := register(t, e, suite.user)
 
-	uploadOrder(t, e, goluhn.Generate(15), token)
+	uploadOrder(t, e, random.OrderID(), token)
 	assertBalance(t, e, 50.0, 0, token)
 
 	e.POST("/api/user/balance/withdraw").
@@ -488,7 +488,7 @@ func (suite *HTTPControllerTestSuite) TestSuccessPath() {
 	// Запрашиваем списание
 	e.POST("/api/user/balance/withdraw").
 		WithHeader("Authorization", token).
-		WithText(fmt.Sprintf(`{"order": "%s", "sum": 10.50}`, goluhn.Generate(15))).
+		WithText(fmt.Sprintf(`{"order": "%s", "sum": 10.50}`, random.OrderID())).
 		Expect().
 		Status(http.StatusOK)
 
