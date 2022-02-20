@@ -27,7 +27,7 @@ func Run(args []string) error {
 	defer cancel()
 
 	l := logger.New()
-	cfg := config.GetConfig(args)
+	cfg := config.Config(args)
 	l.Info().
 		Str("addr", cfg.ServerAddress).
 		Str("db", cfg.DatabaseDSN).
@@ -41,7 +41,7 @@ func Run(args []string) error {
 
 	var db *sql.DB
 	var service *gophermartservice.GophermartService
-	switch cfg.GetRepositoryType() {
+	switch cfg.RepositoryType() {
 	case config.MemoryRepo:
 		service = gophermartservice.New(accrualClient, gophermartservice.WithMemoryStorage())
 	case config.DatabaseRepo:
