@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
-	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/webclient/accrualclient"
+	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrual"
 )
 
 func TestGophermartService_calcNext(t *testing.T) {
@@ -15,7 +15,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 	s := GophermartService{accrualRetryInterval: interval}
 
 	t.Run("no error", func(t *testing.T) {
-		resp := &accrualclient.GetAccrualResponse{
+		resp := &accrual.GetAccrualResponse{
 			Status: entity.OrderStatusNew,
 			Err:    nil,
 		}
@@ -24,16 +24,16 @@ func TestGophermartService_calcNext(t *testing.T) {
 	})
 
 	t.Run("too many requests error", func(t *testing.T) {
-		resp := &accrualclient.GetAccrualResponse{
+		resp := &accrual.GetAccrualResponse{
 			Status: entity.OrderStatusNew,
-			Err:    accrualclient.TooManyRequestsError{RetryAfterSec: 60},
+			Err:    accrual.TooManyRequestsError{RetryAfterSec: 60},
 		}
 		next := s.calcNext(resp)
 		assert.Equal(t, 60*time.Second, next)
 	})
 
 	t.Run("other error", func(t *testing.T) {
-		resp := &accrualclient.GetAccrualResponse{
+		resp := &accrual.GetAccrualResponse{
 			Status: entity.OrderStatusNew,
 			Err:    fmt.Errorf("boo"),
 		}
