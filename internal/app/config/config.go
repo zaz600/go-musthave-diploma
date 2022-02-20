@@ -14,11 +14,11 @@ type AppConfig struct {
 	AccrualAddress string
 }
 
-type RepoType int
+type RepoType string
 
 const (
-	MemoryRepo RepoType = iota
-	DatabaseRepo
+	MemoryRepo   RepoType = "Memory"
+	DatabaseRepo RepoType = "DB"
 )
 
 func (s AppConfig) GetRepositoryType() RepoType {
