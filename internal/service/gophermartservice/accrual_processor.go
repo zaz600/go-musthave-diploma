@@ -11,7 +11,9 @@ import (
 )
 
 //nolint:funlen
-func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
+func (s GophermartService) GetAccruals(orderID string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	order, err := s.repo.OrderRepo.GetOrder(ctx, orderID)
 	if err != nil {
 		log.Err(err).Str("orderID", orderID).Msg("order not found")
@@ -78,7 +80,7 @@ func (s GophermartService) GetAccruals(ctx context.Context, orderID string) {
 		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Msg("GetAccruals context done")
 		return
 	case <-time.After(next):
-		go s.GetAccruals(ctx, orderID) // решедуллим
+		go s.GetAccruals(orderID) // решедуллим
 		return
 	}
 }
