@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
-	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"go.uber.org/ratelimit"
 )
 
@@ -17,8 +16,8 @@ type Provider interface {
 }
 
 type GetAccrualResponse struct {
-	Status  entity.OrderStatus
-	Accrual float32
+	Status  Accrual.ResponseStatus
+	Accrual *float32
 	Err     error
 }
 
@@ -63,17 +62,7 @@ func (c Client) getAccrual(ctx context.Context, orderID string) *GetAccrualRespo
 		Float32("accrual", *resp.JSON200.Accrual).
 		Msg("get accrual result")
 
-	switch resp.JSON200.Status {
-	case Accrual.ResponseStatusINVALID:
-		return &GetAccrualResponse{Accrual: 0.0, Status: entity.OrderStatusInvalid}
-	case Accrual.ResponseStatusPROCESSED:
-		return &GetAccrualResponse{Accrual: *resp.JSON200.Accrual, Status: entity.OrderStatusProcessed}
-	case Accrual.ResponseStatusREGISTERED:
-		return &GetAccrualResponse{Status: entity.OrderStatusProcessing}
-	case Accrual.ResponseStatusPROCESSING:
-		return &GetAccrualResponse{Status: entity.OrderStatusProcessing}
-	}
-	return &GetAccrualResponse{Err: ErrUnknownAccrualStatus}
+	return &GetAccrualResponse{Accrual: resp.JSON200.Accrual, Status: resp.JSON200.Status}
 }
 
 func NewProvider(accrualAPIClient Accrual.ClientWithResponsesInterface) *Client {

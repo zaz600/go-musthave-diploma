@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/zaz600/go-musthave-diploma/internal/entity"
+	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrual"
 )
 
@@ -16,7 +16,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("no error", func(t *testing.T) {
 		resp := &accrual.GetAccrualResponse{
-			Status: entity.OrderStatusNew,
+			Status: Accrual.ResponseStatusREGISTERED,
 			Err:    nil,
 		}
 		next := s.calcNext(resp)
@@ -25,7 +25,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("too many requests error", func(t *testing.T) {
 		resp := &accrual.GetAccrualResponse{
-			Status: entity.OrderStatusNew,
+			Status: Accrual.ResponseStatusREGISTERED,
 			Err:    accrual.TooManyRequestsError{RetryAfterSec: 60},
 		}
 		next := s.calcNext(resp)
@@ -34,7 +34,7 @@ func TestGophermartService_calcNext(t *testing.T) {
 
 	t.Run("other error", func(t *testing.T) {
 		resp := &accrual.GetAccrualResponse{
-			Status: entity.OrderStatusNew,
+			Status: Accrual.ResponseStatusREGISTERED,
 			Err:    fmt.Errorf("boo"),
 		}
 		next := s.calcNext(resp)

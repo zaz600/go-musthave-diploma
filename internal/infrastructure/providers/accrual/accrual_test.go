@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
-	"github.com/zaz600/go-musthave-diploma/internal/entity"
 )
 
 type mockAccrualClient struct {
@@ -30,8 +29,8 @@ func TestClient_GetAccrual(t *testing.T) {
 	accrualProvider := NewProvider(accrualAPIClient)
 	result := accrualProvider.getAccrual(context.TODO(), "1")
 	assert.Error(t, result.Err)
-	assert.Equal(t, float32(0), result.Accrual)
-	assert.Equal(t, entity.OrderStatus(""), result.Status)
+	assert.Nil(t, result.Accrual)
+	assert.Equal(t, Accrual.ResponseStatus(""), result.Status)
 	accrualAPIClient.AssertExpectations(t)
 }
 
@@ -56,8 +55,8 @@ func TestClient_GetAccrual2(t *testing.T) {
 	accrualProvider := NewProvider(accrualAPIClient)
 	result := accrualProvider.getAccrual(context.TODO(), "1")
 	assert.NoError(t, result.Err)
-	assert.Equal(t, float32(555), result.Accrual)
-	assert.Equal(t, entity.OrderStatusProcessed, result.Status)
+	assert.Equal(t, float32(555), *result.Accrual)
+	assert.Equal(t, Accrual.ResponseStatusPROCESSED, result.Status)
 	accrualAPIClient.AssertExpectations(t)
 }
 
@@ -83,7 +82,6 @@ func TestClient_GetAccrual3(t *testing.T) {
 	assert.ErrorAs(t, result.Err, &actualError)
 	assert.Equal(t, 60, actualError.RetryAfterSec)
 	assert.ErrorIs(t, result.Err, ErrTooManyRedirects)
-	assert.Equal(t, float32(0), result.Accrual)
-	assert.Equal(t, entity.OrderStatus(""), result.Status)
+	assert.Nil(t, result.Accrual)
 	accrualAPIClient.AssertExpectations(t)
 }

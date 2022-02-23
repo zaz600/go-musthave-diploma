@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	Accrual "github.com/zaz600/go-musthave-diploma/api/accrual"
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
 	"github.com/zaz600/go-musthave-diploma/internal/infrastructure/providers/accrual"
 )
@@ -55,21 +56,31 @@ func (s GophermartService) GetAccruals(orderID string) {
 	}
 
 	switch resp.Status {
-	case entity.OrderStatusProcessed, entity.OrderStatusInvalid:
-		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Float32("accrual", resp.Accrual).Msg("GetAccruals completed")
-		err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, resp.Status, resp.Accrual)
+	case Accrual.ResponseStatusPROCESSED:
+		accrualAmount := *resp.Accrual
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Str("status", string(resp.Status)).Float32("accrual", accrualAmount).Msg("GetAccruals completed")
+		err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, entity.OrderStatusProcessed, accrualAmount)
 		logError(err)
-		if resp.Accrual > 0 {
+		if *resp.Accrual > 0 {
 			// TODO баланс изменять надо в одной транзакции с регистрацией зачисления
-			err = s.repo.AccountRepo.RefillAmount(ctx, order.UID, resp.Accrual)
+			err = s.repo.AccountRepo.RefillAmount(ctx, order.UID, accrualAmount)
 			logError(err)
 		}
 		return
-	default:
+
+	case Accrual.ResponseStatusINVALID:
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Str("status", string(resp.Status)).Msg("GetAccruals completed")
+		err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, entity.OrderStatusInvalid, 0)
+		logError(err)
+		return
+	case Accrual.ResponseStatusPROCESSING, Accrual.ResponseStatusREGISTERED:
 		if resp.Err == nil {
-			err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, resp.Status, resp.Accrual)
+			err = s.repo.OrderRepo.SetOrderStatusAndAccrual(ctx, orderID, entity.OrderStatusProcessing, 0)
 			logError(err)
 		}
+
+	default:
+		log.Info().Str("orderID", orderID).Int("retryCount", order.RetryCount).Str("status", string(resp.Status)).Msg("unknown accrual status")
 	}
 
 	err = s.repo.OrderRepo.SetOrderNextRetryAt(ctx, orderID, time.Now().Add(next))
