@@ -27,7 +27,7 @@ func (s GophermartService) RegisterUser(ctx context.Context, login string, passw
 	}
 
 	account := entity.NewAccount(user.UID)
-	err = s.repo.AccountRepo.AddAccount(ctx, *account)
+	err = s.repo.AccountRepo.AddAccount(ctx, account)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s GophermartService) LoginUser(ctx context.Context, login string, password
 }
 
 func (s GophermartService) createSession(ctx context.Context, user entity.UserEntity) (*entity.Session, error) {
-	session := entity.NewSession(user.UID)
+	session := entity.NewRandomSession(user.UID)
 	if err := s.repo.SessionRepo.AddSession(ctx, session); err != nil {
 		return nil, fmt.Errorf("error creating user session: %w", err)
 	}

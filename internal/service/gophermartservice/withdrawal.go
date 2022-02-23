@@ -10,7 +10,7 @@ func (s GophermartService) UploadWithdrawal(ctx context.Context, userID string, 
 	// TODO баланс изменять надо в одной транзакции с регистрацией списания
 
 	withdrawal := entity.NewWithdrawal(userID, orderID, sum)
-	err := s.repo.WithdrawalRepo.AddWithdrawal(ctx, *withdrawal)
+	err := s.repo.WithdrawalRepo.AddWithdrawal(ctx, withdrawal)
 	if err != nil {
 		return err
 	}

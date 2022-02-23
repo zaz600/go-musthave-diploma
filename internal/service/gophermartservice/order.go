@@ -16,7 +16,7 @@ func (s GophermartService) UploadOrder(ctx context.Context, userID string, order
 		return ErrInvalidOrderFormat
 	}
 
-	order := *entity.NewOrder(userID, orderID)
+	order := entity.NewOrder(userID, orderID)
 	err := s.repo.OrderRepo.AddOrder(ctx, order)
 	if err != nil {
 		if errors.Is(err, orderrepository.ErrOrderExists) {
