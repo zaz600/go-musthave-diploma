@@ -21,4 +21,5 @@ func (r *RepoRegistry) Close() {
 	_ = r.OrderRepo.Close()
 	_ = r.SessionRepo.Close()
 	_ = r.UserRepo.Close()
+	_ = r.WithdrawalRepo.Close()
 }

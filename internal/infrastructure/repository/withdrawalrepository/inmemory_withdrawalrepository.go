@@ -39,6 +39,10 @@ func (r *InmemoryWithdrawalRepository) GetUserWithdrawals(_ context.Context, use
 	return orders, nil
 }
 
+func (r *InmemoryWithdrawalRepository) Close() error {
+	return nil
+}
+
 func NewInmemoryWithdrawalRepository() *InmemoryWithdrawalRepository {
 	return &InmemoryWithdrawalRepository{
 		mu:              sync.RWMutex{},
