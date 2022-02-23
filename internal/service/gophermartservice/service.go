@@ -17,13 +17,19 @@ type GophermartService struct {
 	accrualRetryInterval time.Duration
 }
 
-func New(accrualAPIClient Accrual.ClientWithResponsesInterface, opts ...Option) *GophermartService {
+func (s GophermartService) Shutdown() {
+	s.repo.Close()
+}
+
+func New(accrualAPIClient Accrual.ClientWithResponsesInterface, opts ...Option) (*GophermartService, error) {
 	s := &GophermartService{
 		accrualProvider:      accrual.NewProvider(accrualAPIClient),
 		accrualRetryInterval: accrualDefaultRetryInterval,
 	}
 	for _, opt := range opts {
-		opt(s)
+		if err := opt(s); err != nil {
+			return nil, err
+		}
 	}
-	return s
+	return s, nil
 }

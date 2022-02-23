@@ -43,7 +43,10 @@ func Run(args []string) error {
 	var service *gophermartservice.GophermartService
 	switch cfg.RepositoryType() {
 	case config.MemoryRepo:
-		service = gophermartservice.New(accrualClient, gophermartservice.WithMemoryStorage())
+		service, err = gophermartservice.New(accrualClient, gophermartservice.WithMemoryStorage())
+		if err != nil {
+			return err
+		}
 	case config.DatabaseRepo:
 		db, err = sql.Open("pgx", cfg.DatabaseDSN)
 		if err != nil {
@@ -54,7 +57,10 @@ func Run(args []string) error {
 		if err != nil {
 			return err
 		}
-		service = gophermartservice.New(accrualClient, gophermartservice.WithPgStorage(db))
+		service, err = gophermartservice.New(accrualClient, gophermartservice.WithPgStorage(db))
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("unknown repo type")
 	}
@@ -64,6 +70,7 @@ func Run(args []string) error {
 	go func() {
 		<-ctx.Done()
 		log.Info().Msg("Shutdown...")
+		service.Shutdown()
 		if db != nil {
 			_ = db.Close()
 		}

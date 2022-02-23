@@ -14,10 +14,10 @@ import (
 
 type StorageType int
 
-type Option func(*GophermartService)
+type Option func(*GophermartService) error
 
 func WithMemoryStorage() Option {
-	return func(s *GophermartService) {
+	return func(s *GophermartService) error {
 		repo := repository.RepoRegistry{
 			UserRepo:       userrepository.NewInmemoryUserRepository(),
 			SessionRepo:    sessionrepository.NewInmemorySessionRepository(),
@@ -26,24 +26,31 @@ func WithMemoryStorage() Option {
 			AccountRepo:    accountrepository.NewInmemoryAccountRepository(),
 		}
 		s.repo = repo
+		return nil
 	}
 }
 
 func WithPgStorage(db *sql.DB) Option {
-	return func(s *GophermartService) {
+	return func(s *GophermartService) error {
+		accrualRepo, err := accountrepository.NewPgAccountRepository(db)
+		if err != nil {
+			return err
+		}
 		repo := repository.RepoRegistry{
 			UserRepo:       userrepository.NewPgUserRepository(db),
 			SessionRepo:    sessionrepository.NewPgSessionRepository(db),
 			OrderRepo:      orderrepository.NewPgOrderRepository(db),
 			WithdrawalRepo: withdrawalrepository.NewPgUserRepository(db),
-			AccountRepo:    accountrepository.NewPgAccountRepository(db),
+			AccountRepo:    accrualRepo,
 		}
 		s.repo = repo
+		return nil
 	}
 }
 
 func WithAccrualRetryInterval(interval time.Duration) Option {
-	return func(s *GophermartService) {
+	return func(s *GophermartService) error {
 		s.accrualRetryInterval = interval
+		return nil
 	}
 }

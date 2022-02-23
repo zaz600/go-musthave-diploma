@@ -15,3 +15,7 @@ type RepoRegistry struct {
 	WithdrawalRepo withdrawalrepository.WithdrawalRepository
 	AccountRepo    accountrepository.AccountRepository
 }
+
+func (r *RepoRegistry) Close() {
+	_ = r.AccountRepo.Close()
+}

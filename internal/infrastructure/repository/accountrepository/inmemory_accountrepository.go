@@ -75,6 +75,10 @@ func (r InmemoryAccountRepository) WithdrawalAmount(_ context.Context, userID st
 	return ErrUserAccountNotFound
 }
 
+func (r InmemoryAccountRepository) Close() error {
+	return nil
+}
+
 func NewInmemoryAccountRepository() *InmemoryAccountRepository {
 	return &InmemoryAccountRepository{
 		mu:           &sync.RWMutex{},

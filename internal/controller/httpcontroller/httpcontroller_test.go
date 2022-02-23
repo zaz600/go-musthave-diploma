@@ -584,7 +584,8 @@ func newRouter(t *testing.T) *chi.Mux {
 		options = append(options, gophermartservice.WithMemoryStorage())
 	}
 
-	service := gophermartservice.New(accrualClient, options...)
+	service, err := gophermartservice.New(accrualClient, options...)
+	require.NoError(t, err)
 	return httpcontroller.NewRouter(service)
 }
 

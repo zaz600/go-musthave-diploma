@@ -11,4 +11,5 @@ type AccountRepository interface {
 	GetAccount(ctx context.Context, userID string) (entity.Account, error)
 	RefillAmount(ctx context.Context, userID string, diff float32) error
 	WithdrawalAmount(ctx context.Context, userID string, diff float32) error
+	Close() error
 }
