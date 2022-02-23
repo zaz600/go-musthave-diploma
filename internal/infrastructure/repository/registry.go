@@ -20,4 +20,5 @@ func (r *RepoRegistry) Close() {
 	_ = r.AccountRepo.Close()
 	_ = r.OrderRepo.Close()
 	_ = r.SessionRepo.Close()
+	_ = r.UserRepo.Close()
 }

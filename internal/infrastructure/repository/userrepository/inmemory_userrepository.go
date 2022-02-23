@@ -39,3 +39,7 @@ func (r *InmemoryUserRepository) AddUser(_ context.Context, userEntity entity.Us
 	r.db[userEntity.Login] = userEntity
 	return nil
 }
+
+func (r *InmemoryUserRepository) Close() error {
+	return nil
+}
