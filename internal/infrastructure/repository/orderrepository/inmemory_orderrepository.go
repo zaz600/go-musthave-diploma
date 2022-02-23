@@ -70,23 +70,6 @@ func (r *InmemoryOrderRepository) GetUserOrders(_ context.Context, userID string
 	return orders, nil
 }
 
-func (r *InmemoryOrderRepository) GetUserAccrual(ctx context.Context, userID string) (float32, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	orders, err := r.GetUserOrders(ctx, userID)
-	if err != nil {
-		return 0, err
-	}
-	var sum float32
-	for _, order := range orders {
-		if order.Status == entity.OrderStatusProcessed {
-			sum += order.Accrual
-		}
-	}
-	return sum, nil
-}
-
 func (r *InmemoryOrderRepository) GetOrder(_ context.Context, orderID string) (entity.Order, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -96,6 +79,10 @@ func (r *InmemoryOrderRepository) GetOrder(_ context.Context, orderID string) (e
 		return entity.Order{}, ErrOrderNotFound
 	}
 	return order, nil
+}
+
+func (r *InmemoryOrderRepository) Close() error {
+	return nil
 }
 
 func NewInmemoryOrderRepository() *InmemoryOrderRepository {

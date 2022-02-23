@@ -12,6 +12,6 @@ type OrderRepository interface {
 	SetOrderStatusAndAccrual(ctx context.Context, orderID string, status entity.OrderStatus, accrual float32) error
 	SetOrderNextRetryAt(ctx context.Context, orderID string, nextRetryAt time.Time) error
 	GetUserOrders(ctx context.Context, userID string) ([]entity.Order, error)
-	GetUserAccrual(ctx context.Context, userID string) (float32, error)
 	GetOrder(ctx context.Context, orderID string) (entity.Order, error)
+	Close() error
 }
