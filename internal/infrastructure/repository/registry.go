@@ -19,4 +19,5 @@ type RepoRegistry struct {
 func (r *RepoRegistry) Close() {
 	_ = r.AccountRepo.Close()
 	_ = r.OrderRepo.Close()
+	_ = r.SessionRepo.Close()
 }

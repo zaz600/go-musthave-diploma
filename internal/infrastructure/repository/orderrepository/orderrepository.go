@@ -2,6 +2,7 @@ package orderrepository
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/zaz600/go-musthave-diploma/internal/entity"
@@ -13,5 +14,5 @@ type OrderRepository interface {
 	SetOrderNextRetryAt(ctx context.Context, orderID string, nextRetryAt time.Time) error
 	GetUserOrders(ctx context.Context, userID string) ([]entity.Order, error)
 	GetOrder(ctx context.Context, orderID string) (entity.Order, error)
-	Close() error
+	io.Closer
 }

@@ -40,9 +40,14 @@ func WithPgStorage(db *sql.DB) Option {
 		if err != nil {
 			return err
 		}
+		sessionRepo, err := sessionrepository.NewPgSessionRepository(db)
+		if err != nil {
+			return err
+		}
+
 		repo := repository.RepoRegistry{
 			UserRepo:       userrepository.NewPgUserRepository(db),
-			SessionRepo:    sessionrepository.NewPgSessionRepository(db),
+			SessionRepo:    sessionRepo,
 			OrderRepo:      orderRepo,
 			WithdrawalRepo: withdrawalrepository.NewPgUserRepository(db),
 			AccountRepo:    accrualRepo,

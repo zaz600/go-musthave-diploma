@@ -38,6 +38,10 @@ func (r *InmemorySessionRepository) GetSession(ctx context.Context, sessionID st
 	return nil, ErrSessionNotFound
 }
 
+func (r *InmemorySessionRepository) Close() error {
+	return nil
+}
+
 func NewInmemorySessionRepository() *InmemorySessionRepository {
 	return &InmemorySessionRepository{
 		mu: sync.RWMutex{},
