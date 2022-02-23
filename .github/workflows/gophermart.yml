@@ -61,3 +61,6 @@ jobs:
             -accrual-host=localhost \
             -accrual-port=$(random unused-port) \
             -accrual-database-uri="postgresql://postgres:postgres@postgres/praktikum?sslmode=disable"
+
+      - name: Unit tests
+        run: go test -gcflags=-l -v -race -count 2 ./internal/...

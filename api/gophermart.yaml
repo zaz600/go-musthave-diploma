@@ -1,0 +1,278 @@
+openapi: "3.0.2"
+info:
+  title: Gophermart Loyalty Service
+  version: "1.0"
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/user/register:
+    post:
+      operationId: userRegister
+      summary: Регистрация пользователя в программе лояльности
+      description: >
+        После успешной регистрации происходит автоматическая аутентификация пользователя через cookie.
+      tags:
+        - Регистрация и аутентификация
+      requestBody:
+        description: Параметры для регистрации
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            example:
+              login: userfoo
+              password: p@sw0dr
+
+      responses:
+        '200':
+          description: Пользователь успешно зарегистрирован и аутентифицирован
+        '400':
+          description: Неверный формат запроса
+        '409':
+          description: Логин уже занят
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /api/user/login:
+    post:
+      operationId: userLogin
+      summary: Аутентификация пользователя
+      description: Аутентификация производится по паре логин/пароль
+      tags:
+        - Регистрация и аутентификация
+      requestBody:
+        description: Параметры для авторизации
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+                login: userfoo
+                password: p@sw0dr
+      responses:
+        '200':
+          description: Пользователь успешно аутентифицирован
+        '400':
+          description: Неверный формат запроса
+        '401':
+          description: Неверная пара логин/пароль
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /api/user/orders:
+    post:
+      operationId: uploadOrder
+      summary: Загрузка номера заказа
+      tags:
+        - Заказы
+      requestBody:
+        description: Номер заказа в Гофермаркете
+        required: true
+        content:
+          text/plain:
+            schema:
+              description: Последовательность цифр произвольной длины
+              type: integer
+              example: 12345678903
+      responses:
+        '200':
+          description: Номер заказа уже был загружен этим пользователем
+        '202':
+          description: Новый номер заказа принят в обработку
+        '400':
+            description: Неверный формат запроса
+        '401':
+            description: Пользователь не аутентифицирован
+        '409':
+            description: Номер заказа уже был загружен другим пользователем
+        '422':
+            description: Неверный формат номера заказа
+        '500':
+            description: Внутренняя ошибка сервера
+
+    get:
+      operationId: getUserOrders
+      summary: Получение списка загруженных номеров заказов
+      tags:
+        - Заказы
+      responses:
+        '200':
+          description: Успешная обработка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersResponse'
+        '204':
+          description: Нет данных для ответа
+        '401':
+          description: Пользователь не авторизован
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /api/user/balance:
+    get:
+      operationId: getUserBalance
+      summary: Получение текущего баланса пользователя
+      tags:
+        - Баланс
+      responses:
+        '200':
+          description: Успешная обработка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBalanceResponse'
+        '401':
+          description: Пользователь не авторизован
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /api/user/balance/withdraw:
+    post:
+      operationId: userBalanceWithdraw
+      summary: Запрос на списание средств
+      tags:
+        - Списания
+        - Баланс
+      requestBody:
+        description: Запрос на списание баллов
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserBalanceWithdrawRequest'
+      responses:
+        '200':
+          description: Успешная обработка запроса
+        '401':
+          description: Пользователь не авторизован
+        '402':
+          description: На счету недостаточно средств
+        '422':
+          description: Неверный формат номера заказа
+        '500':
+          description: Внутренняя ошибка сервера
+
+  /api/user/balance/withdrawals:
+    get:
+      operationId: userBalanceWithdrawals
+      summary: Получение информации о выводе средств
+      responses:
+        '200':
+          description: Успешная обработка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBalanceWithdrawalsResponse'
+
+        '204':
+          description: Нет ни одного списания
+        '401':
+          description: Пользователь не авторизован
+
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+      required:
+        - login
+        - password
+
+    LoginRequest:
+      type: object
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+      required:
+        - login
+        - password
+
+    Order:
+      type: object
+      required:
+        - number
+        - status
+        - uploaded_at
+      properties:
+        number:
+          type: string
+          description: Номер заказа
+          example: "9278923470"
+        status:
+          type: string
+          description: Статус обработки заказа
+          enum:
+            - "NEW"
+            - "PROCESSING"
+            - "INVALID"
+            - "PROCESSED"
+          example: "NEW"
+        accrual:
+          type: number
+          description: Начисленные баллы. Может быть 0 или отсутствовать
+          example: 500
+          multipleOf: 0.01
+
+        uploaded_at:
+          type: string
+          description: Время загрузки заказа
+          example: "2020-12-10T15:12:01+03:00"
+
+    OrdersResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/Order'
+
+    UserBalanceResponse:
+      type: object
+      properties:
+        current:
+          $ref: "#/components/schemas/Amount"
+        withdrawn:
+          $ref: "#/components/schemas/Amount"
+      required:
+        - current
+        - withdrawn
+
+    UserBalanceWithdrawRequest:
+      type: object
+      properties:
+        order:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Amount"
+      required:
+        - order
+        - sum
+
+    UserBalanceWithdrawalsResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/UserBalanceWithdrawal'
+
+    UserBalanceWithdrawal:
+      type: object
+      properties:
+        order:
+          type: string
+        sum:
+          $ref: "#/components/schemas/Amount"
+        processed_at:
+          type: string
+      required:
+        - order
+        - sum
+        - processed_at
+
+    Amount:
+      type: number
+      multipleOf: 0.01
