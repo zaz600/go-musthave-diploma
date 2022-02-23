@@ -1,0 +1,3 @@
+- `go get -u golang.org/x/tools/present`
+- `cd docs/presentation`
+- `present`
